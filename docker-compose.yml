@@ -1,0 +1,32 @@
+
+services:
+  ffmpeg-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ffmpeg-service
+    ports:
+      - "9000:9000"
+    environment:
+      - PORT=9000
+      - TMP_DIR=/tmp/ffout
+      - DATA_DIR=/home/node/data
+      - FONT_PATH=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf
+      - NODE_ENV=development
+    volumes:
+      # Mount source code for hot reload (index.ts in root)
+      - ./index.ts:/app/index.ts:ro
+      # Mount data directory for logo
+      - ./data:/home/node/data
+      # Named volume for tmp to avoid permission issues
+      - tmp-data:/tmp/ffout
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  tmp-data:

@@ -1,0 +1,44 @@
+{
+  "name": "ffmpeg",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "npx nodemon --watch src --ext ts --exec \"ts-node\" opus.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "remotion:studio": "remotion studio remotion/Root.tsx",
+    "remotion:render": "remotion render remotion/Root.tsx Trailer out/trailer.mp4"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@remotion/cli": "4.0.290",
+    "@remotion/renderer": "4.0.290",
+    "archiver": "^7.0.1",
+    "dotenv": "^17.2.3",
+    "express": "^5.1.0",
+    "fluent-ffmpeg": "^2.1.3",
+    "multer": "^2.0.2",
+    "p-limit": "^7.2.0",
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    "remotion": "4.0.290",
+    "sharp": "^0.34.5",
+    "unzipper": "^0.12.3",
+    "uuid": "^13.0.0"
+  },
+  "devDependencies": {
+    "@types/archiver": "^7.0.0",
+    "@types/express": "^5.0.5",
+    "@types/fluent-ffmpeg": "^2.1.28",
+    "@types/multer": "^2.0.0",
+    "@types/react": "18.2.0",
+    "@types/react-dom": "18.2.0",
+    "@types/unzipper": "^0.10.11",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3"
+  }
+}

@@ -1,0 +1,8 @@
+node_modules/
+venv/
+.next/
+out/
+jobs/
+tmp/
+temp/
+*.mp4
