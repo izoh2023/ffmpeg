@@ -175,8 +175,8 @@ def main():
     x, y, w, h = result
     x = max(0, x - args.padding)
     y = max(0, y - args.padding)
-    w = min(w + args.padding * 2, fw - x)
-    h = min(h + args.padding * 2, fh - y)
+    w = min(w + args.padding * 2, fw - x - 1)
+    h = min(h + args.padding * 2, fh - y - 1)
 
     print(json.dumps({
         "x": x, "y": y, "w": w, "h": h,
