@@ -1,13 +1,13 @@
 {
   "name": "ffmpeg",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "HTTP microservice for automated, branded podcast/interview trailer generation (FFmpeg + Remotion + OpenCV).",
+  "main": "dist/opus.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "npx nodemon --watch src --ext ts --exec \"ts-node\" opus.ts",
+    "dev": "nodemon",
     "build": "tsc",
-    "start": "node dist/index.js",
+    "start": "node dist/opus.js",
     "remotion:studio": "remotion studio remotion/Root.tsx",
     "remotion:render": "remotion render remotion/Root.tsx Trailer out/trailer.mp4"
   },

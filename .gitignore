@@ -6,3 +6,7 @@ jobs/
 tmp/
 temp/
 *.mp4
+
+# Secrets / local environment
+.env
+.env.local
