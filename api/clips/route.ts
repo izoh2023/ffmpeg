@@ -7,6 +7,7 @@ import { promises as fsPromises } from "fs";
 import archiver from "archiver";
 import { JOBS_DIR, MAX_PROCESSING_TIME } from "../../utils/configs";
 import { runCmd } from "../../utils/runCmd";
+import { spawn } from "child_process";
 
 const clips = Router();
 const CLIP_CONCURRENCY = 3;
@@ -27,6 +28,86 @@ async function runWithConcurrency<T>(
 
     await Promise.all(Array.from({ length: limit }, worker));
     return results;
+}
+
+// ── Audio-aware boundary snapping ──────────────────────────────────────────────
+// Hard cuts at arbitrary timestamps clip words mid-syllable and (with copied
+// audio) produce clicks/pops. We scan a small window around each nominal cut for
+// silence (pauses) and snap the cut into the nearest pause, so a clip starts
+// cleanly on a word and ends in the gap after the last word instead of catching
+// the first phoneme of the next one.
+const SNAP_WINDOW = 0.6;   // seconds searched on each side of a boundary
+const PREROLL = 0.08;      // lead-in kept before speech onset
+const POSTROLL = 0.12;     // tail kept after the last word
+const SILENCE_DB = -30;    // noise floor (dB) treated as silence
+const MIN_SILENCE = 0.1;   // minimum pause length (s) to count as a pause
+
+interface SilenceRegion {
+    start: number;
+    end: number;
+}
+
+// Scan an audio-only window for silence regions. Times are returned on the
+// original media timeline (the window offset is added back).
+function detectSilences(videoPath: string, winStart: number, winLen: number): Promise<SilenceRegion[]> {
+    return new Promise((resolve) => {
+        const args = [
+            "-ss", winStart.toFixed(3),
+            "-t", winLen.toFixed(3),
+            "-i", videoPath,
+            "-vn",
+            "-af", `silencedetect=noise=${SILENCE_DB}dB:d=${MIN_SILENCE}`,
+            "-f", "null", "-",
+        ];
+        const proc = spawn("ffmpeg", args);
+        let stderr = "";
+        const kill = setTimeout(() => proc.kill("SIGKILL"), 20000);
+        proc.stderr.on("data", (d) => (stderr += d.toString()));
+        proc.on("error", () => { clearTimeout(kill); resolve([]); });
+        proc.on("close", () => {
+            clearTimeout(kill);
+            const regions: SilenceRegion[] = [];
+            const re = /silence_(start|end):\s*(-?[0-9.]+)/g;
+            let open: number | null = null;
+            let m: RegExpExecArray | null;
+            while ((m = re.exec(stderr)) !== null) {
+                const t = parseFloat(m[2]);
+                if (m[1] === "start") {
+                    open = t;
+                } else {
+                    regions.push({ start: winStart + (open ?? 0), end: winStart + t });
+                    open = null;
+                }
+            }
+            // Window ended while still inside a silence.
+            if (open !== null) regions.push({ start: winStart + open, end: winStart + winLen });
+            resolve(regions);
+        });
+    });
+}
+
+// Snap the START into the pause just before speech begins. Returns null if no
+// usable pause is found within SNAP_WINDOW of the nominal point.
+function snapStart(nominal: number, silences: SilenceRegion[]): number | null {
+    const candidates = silences.filter((r) => Math.abs(r.end - nominal) <= SNAP_WINDOW);
+    if (candidates.length === 0) return null;
+    const best = candidates.reduce((a, b) =>
+        Math.abs(b.end - nominal) < Math.abs(a.end - nominal) ? b : a
+    );
+    // Begin a hair before the word onset, but not before the pause itself.
+    return Math.max(0, Math.max(best.start, best.end - PREROLL));
+}
+
+// Snap the END into the pause right after the last word. Returns null if no
+// usable pause is found within SNAP_WINDOW of the nominal point.
+function snapEnd(nominal: number, silences: SilenceRegion[]): number | null {
+    const candidates = silences.filter((r) => Math.abs(r.start - nominal) <= SNAP_WINDOW);
+    if (candidates.length === 0) return null;
+    const best = candidates.reduce((a, b) =>
+        Math.abs(b.start - nominal) < Math.abs(a.start - nominal) ? b : a
+    );
+    // End just into the pause — never reach the next word (it starts at best.end).
+    return Math.min(best.end, best.start + POSTROLL);
 }
 
 export async function processClipJob(jobId: string, jobDir: string, jobFile: string, job: ClipJobData) {
@@ -50,15 +131,44 @@ export async function processClipJob(jobId: string, jobDir: string, jobFile: str
         const startTime = hhmmssToSeconds(clip.start_ffmpeg);
         const endTime = hhmmssToSeconds(clip.end_ffmpeg);
 
-        const safeStart = Math.max(0, startTime - 0.2);
-        const safeEnd = endTime + 0.4;
-        const duration = safeEnd - safeStart;
+        // Scan one window covering the clip plus a margin on each side, then snap
+        // both cut points into the nearest pause. Fall back to a small fixed pad
+        // when no usable silence is found near a boundary.
+        const scanStart = Math.max(0, startTime - SNAP_WINDOW);
+        const scanEnd = endTime + SNAP_WINDOW;
+        let silences: SilenceRegion[] = [];
+        try {
+            silences = await detectSilences(job.inputVideo, scanStart, scanEnd - scanStart);
+        } catch {
+            silences = [];
+        }
 
-        const preSeek = Math.max(0, safeStart - KEYFRAME_SEEK_BUFFER);
-        const postSeek = safeStart - preSeek;
+        let clipStart = snapStart(startTime, silences) ?? Math.max(0, startTime - 0.15);
+        let clipEnd = snapEnd(endTime, silences) ?? endTime + 0.15;
+
+        // Safety net: never let snapping invert or over-shorten a clip.
+        if (clipEnd - clipStart < 1.0) {
+            clipStart = Math.max(0, startTime - 0.15);
+            clipEnd = endTime + 0.15;
+        }
+
+        const duration = clipEnd - clipStart;
+
+        const preSeek = Math.max(0, clipStart - KEYFRAME_SEEK_BUFFER);
+        const postSeek = clipStart - preSeek;
 
         const safeTitle = clip.title.replace(/[^a-zA-Z0-9_\- ]/g, "").replace(/\s+/g, "_");
         const outPath = path.join(outputDir, `${safeTitle}.mp4`);
+
+        // Re-encode audio for a sample-accurate cut (copying AAC snaps to packet
+        // boundaries and leaves a priming pop). loudnorm keeps levels consistent
+        // across clips; the short afades remove edge clicks. Audio-only — no
+        // visual fade, so downstream transitions are unaffected.
+        const fadeOutStart = Math.max(0, duration - 0.06);
+        const audioFilter =
+            `loudnorm=I=-16:TP=-1.5:LRA=11,` +
+            `afade=t=in:st=0:d=0.04,` +
+            `afade=t=out:st=${fadeOutStart.toFixed(3)}:d=0.06`;
 
         const args = [
             "-ss", preSeek.toFixed(3),
@@ -68,8 +178,11 @@ export async function processClipJob(jobId: string, jobDir: string, jobFile: str
             "-c:v", "libx264",
             "-preset", "ultrafast",
             "-crf", "22",
-            "-c:a", "copy",
             "-pix_fmt", "yuv420p",
+            "-c:a", "aac",
+            "-b:a", "192k",
+            "-ar", "48000",
+            "-af", audioFilter,
             "-map_metadata", "-1",
             "-movflags", "+faststart",
             "-y",
