@@ -26,10 +26,28 @@ const PORT: number = Number(process.env.PORT) || 9000;
 const app = express();
 app.use(express.json({ limit: '50mb' }));
 
+// Reject path-traversal attempts before any route handling. Job IDs and file
+// names flow straight into path.join() in the route handlers, so block any
+// segment that could escape the jobs directory.
+app.use((req, res, next) => {
+    let decodedPath: string;
+    try {
+        decodedPath = decodeURIComponent(req.path);
+    } catch {
+        res.status(400).json({ error: 'Malformed URL' });
+        return;
+    }
+    if (decodedPath.includes('\0') || decodedPath.split('/').includes('..')) {
+        res.status(400).json({ error: 'Invalid path' });
+        return;
+    }
+    next();
+});
+
 app.use('/static', (req, res, next) => {
     res.setHeader('Accept-Ranges', 'bytes');
     next();
-}, express.static('/tmp/jobs', {
+}, express.static(JOBS_DIR, {
     setHeaders: (res) => {
         res.setHeader('Accept-Ranges', 'bytes');
         res.setHeader('Cache-Control', 'no-cache');
@@ -124,7 +142,20 @@ worker();
 
 
 app.get('/health', (req, res): void => {
-    res.json({ ok: true, endpoints: ['/host', '/guest', '/merge', '/clip'] });
+    res.json({
+        ok: true,
+        endpoints: [
+            '/upload-video',
+            '/full_interview',
+            '/process-video',
+            '/overlay-video',
+            '/subtitle-video',
+            '/clip-video',
+            '/render-trailer',
+            '/swap-logo',
+            '/remove',
+        ],
+    });
 });
 
 app.listen(PORT, () => {

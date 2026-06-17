@@ -1,5 +1,5 @@
 {
-  "watch": ["src"],
-  "ext": "ts",
-  "exec": "node --loader ts-node/esm src/index.ts"
+  "watch": ["opus.ts", "api", "utils", "remotion"],
+  "ext": "ts,tsx",
+  "exec": "ts-node opus.ts"
 }

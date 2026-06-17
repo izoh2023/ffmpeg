@@ -1,8 +1,10 @@
 import multer from 'multer';
-import path from "node:path";
 
-export const JOBS_DIR = path.join("/home/isaac", "jobs");
+// Single source of truth for the jobs/working directory.
+// Overridable via JOBS_DIR; defaults to /tmp/jobs (matches the Docker image
+// and the /static mount in opus.ts).
+export const JOBS_DIR = process.env.JOBS_DIR || "/tmp/jobs";
 export const upload = multer({ dest: JOBS_DIR });
 
-export const MAX_PROCESSING_TIME = 6000000; // 3 minutes max
-export const STALL_TIMEOUT = 60000; // 45 seconds without progress = stall
+export const MAX_PROCESSING_TIME = 6000000; // 100 minutes max per command
+export const STALL_TIMEOUT = 60000;         // 60s without progress = stalled
