@@ -116,8 +116,14 @@ export async function processLogoSwapJob(
     await update(30);
     const finalOut = path.join(jobDir, "output.mp4");
 
+    // Clamp delogo region strictly inside frame (ffmpeg delogo rejects edge-touching regions)
+    const delogoX = Math.min(region.x, region.frame_w - 2);
+    const delogoY = Math.min(region.y, region.frame_h - 2);
+    const delogoW = Math.min(region.w, region.frame_w - delogoX - 1);
+    const delogoH = Math.min(region.h, region.frame_h - delogoY - 1);
+
     const filterComplex = [
-        `[0:v]delogo=x=${region.x}:y=${region.y}:w=${region.w}:h=${region.h}[clean]`,
+        `[0:v]delogo=x=${delogoX}:y=${delogoY}:w=${delogoW}:h=${delogoH}[clean]`,
         `[1:v]scale=${overlay.size}:-1[logo]`,
         `[clean][logo]overlay=${overlay.x}:${overlay.y}`,
     ].join(";");
