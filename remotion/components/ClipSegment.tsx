@@ -1,182 +1,218 @@
 import React from 'react';
 import {
   AbsoluteFill,
+  interpolate,
   useCurrentFrame,
   useVideoConfig,
   Video,
 } from 'remotion';
-import { ClipProp, BrandingProp, GuestProp } from '../types';
-import {
-  COLORS,
-  TIMING,
-  fadeIn,
-  fadeOut,
-  fadeUp,
-  drawIn,
-} from './utils/animations';
+import { ClipProp, ResolvedBranding, GuestProp, MotionProp } from '../types';
+import { EASE_EXPO_OUT, zoomPush } from './utils/animations';
 
 interface ClipSegmentProps {
   clip: ClipProp;
   guest: GuestProp;
-  branding: BrandingProp;
-  isFirst: boolean;
+  branding: ResolvedBranding;
+  motion: MotionProp;
+  clipIndex: number;
+  totalClips: number;
+  /** First clip in the sequence — gets the broadcast-style guest attribution. */
+  isFirst?: boolean;
 }
 
 /**
- * Talking-head clip segment.
- *
- * Beats:
- *   00–14f    clean fade in (no zoom punch, no flash)
- *   isFirst:
- *     14–34f  vertical accent grows
- *     18–38f  guest name fades up
- *     26–46f  guest title/company fades up
- *     ── lower third holds for the full clip ──
- *   end-12f   scene fades out (lower third goes with it)
+ * Clip segment — full-bleed video with a smooth lower third.
+ * Theme-driven; colors/fonts/clip-prefix come from props.branding.
  */
 export const ClipSegment: React.FC<ClipSegmentProps> = ({
   clip,
   guest,
   branding,
-  isFirst,
+  motion,
+  clipIndex,
+  isFirst = false,
 }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
-  const clipDuration = clip.duration * fps;
+  const clipDuration = Math.round(clip.duration * fps);
 
-  // Scene-level fade in / out — no transform, no scale punch.
-  const sceneIn = fadeIn(frame, 0, TIMING.intro - 8); // ~14f
-  const sceneOut = fadeOut(frame, clipDuration - TIMING.fadeBlackOut, TIMING.fadeBlackOut);
+  const { colors, fonts, copy } = branding;
+
+  const sceneIn = interpolate(frame, [0, 16], [0, 1], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+    easing: EASE_EXPO_OUT,
+  });
+  const sceneOut = interpolate(frame, [clipDuration - 14, clipDuration], [1, 0], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+    easing: EASE_EXPO_OUT,
+  });
   const opacity = Math.min(sceneIn, sceneOut);
 
-  // Vignette — settles in once, holds.
-  const vignetteOpacity = fadeIn(frame, 0, TIMING.intro);
+  const ZOOM_START = clipDuration - 10;
+  const zoom = zoomPush(frame, ZOOM_START, 10, 1.05);
 
-  // Lower third (first clip only). Holds for the full clip — only fades with the
-  // scene-level `opacity` above. The viewer needs time to read the name + title.
-  const accentProgress = drawIn(frame, 14, 22);
+  const borderProgress = interpolate(frame, [14, 32], [0, 1], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+    easing: EASE_EXPO_OUT,
+  });
 
-  const name = fadeUp(frame, fps, 18, 12);
-  const sub = fadeUp(frame, fps, 26, 10);
+  const titleX = interpolate(frame, [18, 36], [-18, 0], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+    easing: EASE_EXPO_OUT,
+  });
+  const titleOpacity = interpolate(frame, [18, 36], [0, 1], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+    easing: EASE_EXPO_OUT,
+  });
+
+  const showSoftWash = motion.energy === 'hype' && clipIndex > 0;
+  const softWashOpacity = interpolate(frame, [0, 4, 12], [0.32, 0.14, 0], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+    easing: EASE_EXPO_OUT,
+  });
+
+  const cornerOpacity = interpolate(frame, [26, 40], [0, 0.45], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+    easing: EASE_EXPO_OUT,
+  });
+
+  const lowerThirdText = clip.captionOverride ?? clip.title;
 
   return (
     <AbsoluteFill
       style={{
         opacity,
-        backgroundColor: COLORS.bgDeep,
+        backgroundColor: colors.backgroundDeep,
         overflow: 'hidden',
       }}
     >
-      {/* Video — full bleed, untouched by scale punches. */}
-      <AbsoluteFill>
+      <AbsoluteFill
+        style={{
+          transform: `scale(${zoom})`,
+          transformOrigin: 'center center',
+        }}
+      >
         <Video
           src={clip.videoPath}
-          style={{
-            width: '100%',
-            height: '100%',
-            objectFit: 'cover',
-          }}
+          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
         />
       </AbsoluteFill>
 
-      {/* Vignette — texture, never theatrical. */}
+      {/* Bottom scrim */}
       <AbsoluteFill
         style={{
           background:
-            'radial-gradient(ellipse at center, transparent 58%, rgba(0,0,0,0.55) 100%)',
-          opacity: vignetteOpacity,
+            'linear-gradient(to top, rgba(0,0,0,0.78) 0%, rgba(0,0,0,0.25) 22%, transparent 42%)',
           pointerEvents: 'none',
         }}
       />
 
-      {isFirst && (
-        <>
-          {/* Bottom scrim — only behind the lower third. */}
-          <AbsoluteFill
+      {/* Lower third */}
+      <AbsoluteFill
+        style={{
+          justifyContent: 'flex-end',
+          alignItems: 'flex-start',
+          padding: '0 72px 56px 72px',
+          pointerEvents: 'none',
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'row',
+            alignItems: 'stretch',
+            gap: 18,
+          }}
+        >
+          <div
             style={{
-              background:
-                'linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.35) 22%, transparent 45%)',
-              pointerEvents: 'none',
+              width: 3,
+              minHeight: 64,
+              backgroundColor: colors.primary,
+              transform: `scaleY(${borderProgress})`,
+              transformOrigin: 'top center',
+              boxShadow: `0 0 10px ${colors.primary}88`,
             }}
           />
 
-          <AbsoluteFill
+          <div
             style={{
-              justifyContent: 'flex-end',
-              alignItems: 'flex-start',
-              padding: '0 80px 72px 80px',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              opacity: titleOpacity,
+              transform: `translateX(${titleX}px)`,
             }}
           >
             <div
               style={{
-                display: 'flex',
-                flexDirection: 'row',
-                alignItems: 'flex-start',
-                gap: 18,
+                color: colors.textCream,
+                fontFamily: fonts.body,
+                fontSize: 20,
+                fontWeight: 600,
+                letterSpacing: '0.01em',
+                lineHeight: 1.25,
+                maxWidth: 740,
               }}
             >
-              {/* Vertical accent — grows downward from the top. */}
+              {lowerThirdText}
+            </div>
+
+            {isFirst && (
               <div
                 style={{
-                  width: 2,
-                  height: 64,
+                  color: colors.primary,
+                  fontFamily: fonts.body,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  letterSpacing: '0.18em',
+                  textTransform: 'uppercase',
                   marginTop: 8,
-                  flexShrink: 0,
-                  backgroundColor: COLORS.hairline,
-                  overflow: 'hidden',
-                  position: 'relative',
+                  paddingLeft: '0.18em',
                 }}
               >
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    width: '100%',
-                    height: `${accentProgress * 100}%`,
-                    backgroundColor: branding.primaryColor,
-                  }}
-                />
+                {guest.name}
               </div>
+            )}
+          </div>
+        </div>
+      </AbsoluteFill>
 
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                {/* Name */}
-                <div
-                  style={{
-                    opacity: name.opacity,
-                    transform: `translateY(${name.y}px)`,
-                    color: COLORS.textPrimary,
-                    fontSize: 36,
-                    fontWeight: 600,
-                    fontFamily: 'Inter, sans-serif',
-                    letterSpacing: '-0.01em',
-                    lineHeight: 1.1,
-                  }}
-                >
-                  {guest.name}
-                </div>
+      {/* Corner marker */}
+      <div
+        style={{
+          position: 'absolute',
+          top: 28,
+          right: 36,
+          opacity: cornerOpacity,
+          color: colors.textCream,
+          fontFamily: fonts.body,
+          fontSize: 11,
+          fontWeight: 600,
+          letterSpacing: '0.32em',
+        }}
+      >
+        {copy.clipPrefix} {String(clipIndex + 1).padStart(2, '0')}
+      </div>
 
-                {/* Title · Company */}
-                <div
-                  style={{
-                    opacity: sub.opacity,
-                    transform: `translateY(${sub.y}px)`,
-                    color: COLORS.textSecondary,
-                    fontSize: 18,
-                    fontWeight: 500,
-                    fontFamily: 'Inter, sans-serif',
-                    letterSpacing: '0.02em',
-                    marginTop: 8,
-                  }}
-                >
-                  <span style={{ color: branding.primaryColor }}>{guest.title}</span>
-                  <span style={{ opacity: 0.5, margin: '0 0.5em' }}>·</span>
-                  <span>{guest.company}</span>
-                </div>
-              </div>
-            </div>
-          </AbsoluteFill>
-        </>
+      {/* Hype-only soft brand wash */}
+      {showSoftWash && (
+        <AbsoluteFill
+          style={{
+            background:
+              `radial-gradient(ellipse at center, ${colors.primary}55 0%, transparent 70%)`,
+            opacity: softWashOpacity,
+            mixBlendMode: 'screen',
+            pointerEvents: 'none',
+          }}
+        />
       )}
     </AbsoluteFill>
   );

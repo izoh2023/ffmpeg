@@ -1,214 +1,253 @@
 import React from 'react';
 import {
   AbsoluteFill,
+  Img,
   interpolate,
   spring,
   useCurrentFrame,
   useVideoConfig,
-  Video,
 } from 'remotion';
-import { GuestProp, BrandingProp, ClipProp } from '../types';
+import { GuestProp, ResolvedBranding, MotionProp } from '../types';
 import {
-  COLORS,
-  TIMING,
-  SPRING_SETTLE,
+  EASE_EXPO_OUT,
+  SPRING_TIGHT,
   fadeIn,
-  fadeOut,
   fadeUp,
-  letterSpacingSettle,
-  kenBurns,
-  drawIn,
 } from './utils/animations';
 
 interface GuestCardProps {
   guest: GuestProp;
-  branding: BrandingProp;
-  firstClip: ClipProp;
+  branding: ResolvedBranding;
+  motion: MotionProp;
 }
 
 /**
- * Guest reveal card — a two-act, "pulling-focus" reveal.
- *
- *   ── Act I — Hero (frames 0–55) ────────────────────────────────────
- *   The clip is heavily blurred and dimmed. The guest name sits
- *   centered, large, with letter-spacing settling on arrival.
- *
- *   ── Act II — Settle (frames 55–82) ─────────────────────────────────
- *   Blur and scrim ease away as the name drifts from screen-center
- *   down to the lower-third position and shrinks to caption size.
- *
- *   ── Act III — Lower third (frames 78–end) ──────────────────────────
- *   Vertical accent grows beside the settled name. Title and company
- *   fade up beneath. Holds. Final 12 frames fade to black.
- *
- * All lower-third elements (name in its settled state, accent rule,
- * title, company) share a single coordinate system anchored to the
- * canvas, so they align regardless of the name string's length.
+ * Scene 2 — Broadcast guest introduction slate. Theme-driven.
  */
-
-// ─── Lower-third geometry (% of 1920×1080 canvas) ─────────────────────────────
-//   These are the resting positions. The name interpolates from the hero
-//   centerpoint to NAME_SETTLED, while title/company stay anchored.
-const LT = {
-  leftPad:        7.3,   // 5% canvas pad + 22px accent + 22px gap, on 1920
-  accentLeft:     5.0,
-  nameTop:       78.0,
-  titleTop:      86.5,
-  companyTop:    90.0,
-  accentTop:     78.0,
-  accentHeight:  80,     // px
-};
-
 export const GuestCard: React.FC<GuestCardProps> = ({
   guest,
   branding,
-  firstClip,
+  motion,
 }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
-  const guestCardDuration = 4 * fps;
+  const guestCardDuration = 5 * fps; // 150f
 
-  // ─── Beats ────────────────────────────────────────────────────────────────
-  const HERO_HOLD   = 55;
-  const SETTLE_DUR  = 26;
-  const SETTLE_END  = HERO_HOLD + SETTLE_DUR;
+  const { colors, fonts, copy } = branding;
 
-  // ─── Reveal driver — single spring controls every coordinated change ─────
-  // 0 = hero centered + heavy blur ; 1 = lower-third settled + cleared
-  const reveal = spring({
-    frame: frame - HERO_HOLD,
-    fps,
-    config: SPRING_SETTLE,
-    durationInFrames: SETTLE_DUR,
-    from: 0,
-    to: 1,
+  // ─── Scene entrance + exit ──────────────────────────────────────────────
+  const sceneIn = interpolate(frame, [0, 16], [0, 1], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+    easing: EASE_EXPO_OUT,
   });
-
-  // ─── Background — Ken Burns + blur/brightness easing alongside reveal ────
-  const mediaScale = kenBurns(frame, guestCardDuration, 1.05, 1.0);
-  const mediaOpacity = fadeIn(frame, 0, TIMING.intro);
-  const blurPx     = interpolate(reveal, [0, 1], [18, 6],   { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
-  const brightness = interpolate(reveal, [0, 1], [0.4, 0.62], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
-  const scrim      = interpolate(reveal, [0, 1], [0.7, 0.42], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
-
-  // ─── Hero name entrance ──────────────────────────────────────────────────
-  const nameEntrance = fadeUp(frame, fps, 4, 14);
-  const nameLetterSpacing = letterSpacingSettle(frame, 4, 0.06, -0.02, TIMING.introLong);
-
-  // ─── Hero → settled morph ────────────────────────────────────────────────
-  const nameLeftPct  = interpolate(reveal, [0, 1], [50, LT.leftPad], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
-  const nameTopPct   = interpolate(reveal, [0, 1], [50, LT.nameTop], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
-  const nameTxPct    = interpolate(reveal, [0, 1], [-50, 0],         { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
-  const nameTyPct    = interpolate(reveal, [0, 1], [-50, 0],         { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
-  const nameFontSize = interpolate(reveal, [0, 1], [104, 68],        { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
-
-  // ─── Lower-third companions arrive after the name has settled ────────────
-  const accentProgress = drawIn(frame, SETTLE_END - 4, 20);
-  const accentOpacity  = fadeUp(frame, fps, SETTLE_END - 4, 0).opacity;
-  const title   = fadeUp(frame, fps, SETTLE_END + 2, 10);
-  const company = fadeUp(frame, fps, SETTLE_END + 10, 10);
-
-  // ─── Outro ───────────────────────────────────────────────────────────────
-  const fade = fadeOut(
+  const sceneOut = interpolate(
     frame,
-    guestCardDuration - TIMING.fadeBlackOut,
-    TIMING.fadeBlackOut
+    [guestCardDuration - 16, guestCardDuration],
+    [1, 0],
+    { extrapolateLeft: 'clamp', extrapolateRight: 'clamp', easing: EASE_EXPO_OUT }
   );
+  const sceneOpacity = Math.min(sceneIn, sceneOut);
+
+  // ─── Brush stroke nameplate sweep ───────────────────────────────────────
+  const brushProgress = interpolate(frame, [12, 34], [0, 1], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+    easing: EASE_EXPO_OUT,
+  });
+  const brushOpacity = fadeIn(frame, 12, 10);
+
+  // ─── Guest photo slides in from right ───────────────────────────────────
+  const photoSpring = spring({
+    frame: frame - 20,
+    fps,
+    config: SPRING_TIGHT,
+    from: 1,
+    to: 0,
+    durationInFrames: 24,
+  });
+  const photoX = photoSpring * 360;
+  const photoOpacity = fadeIn(frame, 20, 14);
+
+  // ─── Shutter flash ──────────────────────────────────────────────────────
+  const shutterStart = 38;
+  const shutterOpacity = interpolate(
+    frame,
+    [
+      shutterStart,      shutterStart + 1.5, shutterStart + 3,
+      shutterStart + 4.5, shutterStart + 6,  shutterStart + 7.5,
+      shutterStart + 9,  shutterStart + 10.5,
+    ],
+    [0, 0.55, 0, 0.5, 0, 0.45, 0, 0],
+    { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
+  );
+
+  // ─── Warm color grade ───────────────────────────────────────────────────
+  const warmGradeOpacity = interpolate(frame, [48, 68], [0, 0.32], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+    easing: EASE_EXPO_OUT,
+  });
+  const warmTint = colorGradeTint(motion.colorGrade, colors.primary);
+
+  // ─── Typography reveals ─────────────────────────────────────────────────
+  const name    = fadeUp(frame, fps, 48, 18);
+  const title   = fadeUp(frame, fps, 62, 14);
+  const company = fadeUp(frame, fps, 74, 12);
+  const handle  = fadeUp(frame, fps, 84, 10);
+
+  // ─── Watermark ──────────────────────────────────────────────────────────
+  const watermarkOpacity = fadeIn(frame, 18, 18);
 
   return (
     <AbsoluteFill
       style={{
-        opacity: fade,
-        backgroundColor: COLORS.bg,
+        opacity: sceneOpacity,
+        backgroundColor: colors.navy,
         overflow: 'hidden',
       }}
     >
-      {/* Background video — softens to reveal as the name settles. */}
+      {/* Animated grain texture */}
       <AbsoluteFill
         style={{
-          opacity: mediaOpacity,
-          transform: `scale(${mediaScale})`,
-          transformOrigin: 'center center',
-        }}
-      >
-        <Video
-          src={firstClip.videoPath}
-          style={{
-            width: '100%',
-            height: '100%',
-            objectFit: 'cover',
-            filter: `blur(${blurPx}px) brightness(${brightness}) saturate(0.95)`,
-          }}
-          volume={0}
-        />
-      </AbsoluteFill>
-
-      {/* Scrim — eases from heavy to readable as reveal progresses. */}
-      <AbsoluteFill
-        style={{
-          background: `linear-gradient(180deg, rgba(0,0,0,${scrim * 0.85}) 0%, rgba(0,0,0,${scrim}) 100%)`,
+          backgroundImage: `url("${GRAIN_DATA_URI}")`,
+          backgroundSize: '220px 220px',
+          opacity: 0.18,
+          mixBlendMode: 'overlay',
+          pointerEvents: 'none',
         }}
       />
 
-      {/* Vertical accent rule — appears with the settled name. */}
+      {/* Subtle brand-primary glow for depth */}
+      <AbsoluteFill
+        style={{
+          background: `radial-gradient(ellipse at 30% 65%, ${colors.primary}1f 0%, ${colors.navy} 60%)`,
+          pointerEvents: 'none',
+        }}
+      />
+
+      {/* Brush-stroke nameplate */}
       <div
         style={{
           position: 'absolute',
-          left: `${LT.accentLeft}%`,
-          top: `${LT.accentTop}%`,
-          width: 2,
-          height: LT.accentHeight,
-          backgroundColor: COLORS.hairline,
-          opacity: accentOpacity,
+          left: '6%',
+          bottom: '20%',
+          width: '58%',
+          height: 4,
+          backgroundColor: colors.primary,
+          opacity: brushOpacity,
+          clipPath: `inset(0 ${(1 - brushProgress) * 100}% 0 0)`,
+          transformOrigin: 'left center',
+          boxShadow: `0 0 24px ${colors.primary}66`,
+        }}
+      />
+
+      {/* Secondary thin stroke */}
+      <div
+        style={{
+          position: 'absolute',
+          left: '6%',
+          bottom: 'calc(20% + 12px)',
+          width: '36%',
+          height: 1,
+          backgroundColor: `${colors.primary}80`,
+          opacity: brushOpacity,
+          clipPath: `inset(0 ${(1 - Math.max(0, brushProgress - 0.2) / 0.8) * 100}% 0 0)`,
+        }}
+      />
+
+      {/* Guest photo */}
+      <div
+        style={{
+          position: 'absolute',
+          right: '8%',
+          top: '50%',
+          transform: `translate(${photoX}px, -50%)`,
+          opacity: photoOpacity,
+          width: 360,
+          height: 460,
+          borderRadius: 22,
           overflow: 'hidden',
+          boxShadow: `0 30px 60px rgba(0,0,0,0.55), 0 0 0 1px ${colors.primary}40`,
         }}
       >
+        <Img
+          src={guest.photoPath}
+          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+        />
+        {/* Warm color grade overlay */}
         <div
           style={{
             position: 'absolute',
-            top: 0,
-            left: 0,
-            width: '100%',
-            height: `${accentProgress * 100}%`,
-            backgroundColor: branding.primaryColor,
+            inset: 0,
+            background: warmTint,
+            opacity: warmGradeOpacity,
+            mixBlendMode: 'overlay',
+            pointerEvents: 'none',
+          }}
+        />
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            background: 'linear-gradient(180deg, transparent 60%, rgba(0,0,0,0.5) 100%)',
+            pointerEvents: 'none',
           }}
         />
       </div>
 
-      {/* Guest name — animates from screen-center to lower-third. */}
+      {/* INTRODUCING eyebrow */}
       <div
         style={{
           position: 'absolute',
-          left: `${nameLeftPct}%`,
-          top: `${nameTopPct}%`,
-          transform: `translate(${nameTxPct}%, ${nameTyPct}%) translateY(${nameEntrance.y}px)`,
-          opacity: nameEntrance.opacity,
-          color: COLORS.textPrimary,
-          fontSize: nameFontSize,
-          fontWeight: 600,
-          fontFamily: 'Inter, sans-serif',
-          letterSpacing: nameLetterSpacing,
+          left: '6%',
+          bottom: 'calc(20% + 220px)',
+          opacity: brushOpacity,
+          color: colors.primary,
+          fontFamily: fonts.body,
+          fontSize: 13,
+          fontWeight: 700,
+          letterSpacing: '0.42em',
+          textTransform: 'uppercase',
+          paddingLeft: '0.42em',
+        }}
+      >
+        {copy.introducing}
+      </div>
+
+      {/* Guest name */}
+      <div
+        style={{
+          position: 'absolute',
+          left: '6%',
+          bottom: 'calc(20% + 90px)',
+          opacity: name.opacity,
+          transform: `translateY(${name.y + 4}px)`,
+          color: colors.textCream,
+          fontFamily: fonts.display,
+          fontSize: 64,
+          fontWeight: 700,
+          letterSpacing: '-0.01em',
           lineHeight: 1.0,
           whiteSpace: 'nowrap',
-          willChange: 'transform, font-size',
         }}
       >
         {guest.name}
       </div>
 
-      {/* Title — anchored to lower-third, fades in after the move. */}
+      {/* Title */}
       <div
         style={{
           position: 'absolute',
-          left: `${LT.leftPad}%`,
-          top: `${LT.titleTop}%`,
+          left: '6%',
+          bottom: 'calc(20% - 42px)',
           opacity: title.opacity,
           transform: `translateY(${title.y}px)`,
-          color: branding.primaryColor,
+          color: colors.primary,
+          fontFamily: fonts.body,
           fontSize: 22,
           fontWeight: 500,
-          fontFamily: 'Inter, sans-serif',
-          letterSpacing: '0.01em',
+          letterSpacing: '0.04em',
           whiteSpace: 'nowrap',
         }}
       >
@@ -219,29 +258,92 @@ export const GuestCard: React.FC<GuestCardProps> = ({
       <div
         style={{
           position: 'absolute',
-          left: `${LT.leftPad}%`,
-          top: `${LT.companyTop}%`,
-          opacity: company.opacity,
+          left: '6%',
+          bottom: 'calc(20% - 78px)',
+          opacity: company.opacity * 0.7,
           transform: `translateY(${company.y}px)`,
-          color: COLORS.textSecondary,
+          color: colors.textCream,
+          fontFamily: fonts.body,
           fontSize: 18,
-          fontWeight: 400,
-          fontFamily: 'Inter, sans-serif',
-          letterSpacing: '0.04em',
+          fontWeight: 300,
+          letterSpacing: '0.08em',
           whiteSpace: 'nowrap',
         }}
       >
         {guest.company}
       </div>
 
-      {/* Vignette */}
+      {/* LinkedIn handle */}
+      {guest.linkedIn && (
+        <div
+          style={{
+            position: 'absolute',
+            left: '6%',
+            bottom: 'calc(20% - 116px)',
+            opacity: handle.opacity,
+            transform: `translateY(${handle.y}px)`,
+            color: colors.textCreamDim,
+            fontFamily: fonts.body,
+            fontSize: 13,
+            fontWeight: 500,
+            letterSpacing: '0.06em',
+          }}
+        >
+          {copy.linkedInPrefix}{guest.linkedIn}
+        </div>
+      )}
+
+      {/* Corner watermark — hidden if copy.watermark is empty string */}
+      {copy.watermark && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 28,
+            right: 36,
+            opacity: watermarkOpacity * 0.55,
+            color: colors.textCream,
+            fontFamily: fonts.body,
+            fontSize: 12,
+            fontWeight: 500,
+            letterSpacing: '0.18em',
+          }}
+        >
+          {copy.watermark}
+        </div>
+      )}
+
+      {/* Camera shutter flashes */}
       <AbsoluteFill
         style={{
-          background:
-            'radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,0.55) 100%)',
+          backgroundColor: '#ffffff',
+          opacity: shutterOpacity,
           pointerEvents: 'none',
         }}
       />
     </AbsoluteFill>
   );
 };
+
+// ─── Helpers ───────────────────────────────────────────────────────────────
+
+const colorGradeTint = (
+  grade: MotionProp['colorGrade'],
+  brandPrimary: string
+): string => {
+  switch (grade) {
+    case 'warm':
+      return `linear-gradient(135deg, ${brandPrimary}cc 0%, #c97a1f80 100%)`;
+    case 'cool':
+      return 'linear-gradient(135deg, #3b6fcccc 0%, #0d1f4180 100%)';
+    case 'neutral':
+    default:
+      return 'linear-gradient(135deg, rgba(255,240,220,0.6) 0%, rgba(40,40,40,0.4) 100%)';
+  }
+};
+
+const GRAIN_SVG =
+  `<svg xmlns="http://www.w3.org/2000/svg" width="220" height="220">` +
+  `<filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" stitchTiles="stitch"/>` +
+  `<feColorMatrix values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.7 0"/></filter>` +
+  `<rect width="100%" height="100%" filter="url(#n)" opacity="0.6"/></svg>`;
+const GRAIN_DATA_URI = `data:image/svg+xml;utf8,${encodeURIComponent(GRAIN_SVG)}`;

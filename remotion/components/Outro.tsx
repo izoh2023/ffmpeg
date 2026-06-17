@@ -1,188 +1,236 @@
 import React from 'react';
 import {
   AbsoluteFill,
+  interpolate,
+  spring,
   useCurrentFrame,
   useVideoConfig,
   Img,
 } from 'remotion';
-import { BrandingProp, EpisodeProp } from '../types';
+import { ResolvedBranding, EpisodeProp } from '../types';
 import {
-  COLORS,
-  TIMING,
-  cardReveal,
+  EASE_EXPO_OUT,
+  SPRING_TIGHT,
   fadeUp,
-  fadeOut,
-  letterSpacingSettle,
-  drawIn,
-  splitWords,
-  wordStaggerStyle,
 } from './utils/animations';
 
 interface OutroProps {
-  branding: BrandingProp;
+  branding: ResolvedBranding;
   episode: EpisodeProp;
   musicPath: string;
 }
 
 /**
- * Outro card.
+ * Scene 5 — Episode card + CTA. Theme-driven.
  *
- * Beats:
- *   00–08f    fade in from black
- *   06–32f    logo reveals (scale 0.96 → 1, fade)
- *   18–44f    show name fades up (word stagger, letter-spacing settle)
- *   28–50f    hairline accent draws in
- *   38–60f    episode title fades up
- *   54–74f    "Available now" fades up — no looping pulse
- *   end-15f   fade out
+ * Background is `colors.primary` full-bleed (gold by default), title is
+ * `colors.textNavy`, pill uses `colors.navy` + `colors.textCream`.
+ * "Coming Soon"-style CTA copy comes from `copy.availableNow` (but the
+ * pill itself shows `episode.number` — e.g. "Coming Soon").
  */
 export const Outro: React.FC<OutroProps> = ({ branding, episode }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
-  const outroDuration = 4 * fps;
+  const outroDuration = 7 * fps; // 210f
 
-  // Scene fade in/out.
-  const fadeInOpacity = fadeUp(frame, fps, 0, 0).opacity;
-  const fade = fadeOut(frame, outroDuration - 15, 15);
-  const sceneOpacity = Math.min(fadeInOpacity, fade);
+  const { colors, fonts } = branding;
 
-  // Logo
-  const logo = cardReveal(frame, fps, 6, 0.96);
+  // Scene fades
+  const sceneIn = interpolate(frame, [0, 16], [0, 1], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+    easing: EASE_EXPO_OUT,
+  });
+  const sceneOut = interpolate(
+    frame,
+    [outroDuration - 36, outroDuration],
+    [1, 0],
+    { extrapolateLeft: 'clamp', extrapolateRight: 'clamp', easing: EASE_EXPO_OUT }
+  );
+  const sceneOpacity = Math.min(sceneIn, sceneOut);
 
-  // Show name (word-staggered)
-  const showWords = splitWords(branding.showName);
-  const nameLetterSpacing = letterSpacingSettle(frame, 18, 0.08, -0.02);
+  // Background brightness pulse
+  const bgPulse = 1 + 0.04 * Math.sin((frame / fps) * 0.9 * Math.PI);
 
-  // Hairline rule
-  const ruleProgress = drawIn(frame, 28, TIMING.introLong);
-  const ruleOpacity = fadeUp(frame, fps, 28, 6).opacity;
+  // Title slides down from above
+  const titleSpring = spring({
+    frame: frame - 10,
+    fps,
+    config: SPRING_TIGHT,
+    from: -90,
+    to: 0,
+    durationInFrames: 32,
+  });
+  const titleOpacity = interpolate(frame, [10, 30], [0, 1], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+    easing: EASE_EXPO_OUT,
+  });
 
-  // Episode title and CTA
-  const title = fadeUp(frame, fps, 38, 12);
-  const cta = fadeUp(frame, fps, 54, 8);
+  // Pill rises + straightens
+  const pillAppear = spring({
+    frame: frame - 38,
+    fps,
+    config: SPRING_TIGHT,
+    from: 0,
+    to: 1,
+    durationInFrames: 20,
+  });
+  const pillStraighten = spring({
+    frame: frame - 46,
+    fps,
+    config: SPRING_TIGHT,
+    from: 1,
+    to: 0,
+    durationInFrames: 28,
+  });
+  const pillRotation = pillStraighten * -5;
+  const pillScale = pillAppear;
+  const pillOpacity = interpolate(frame, [38, 52], [0, 1], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+    easing: EASE_EXPO_OUT,
+  });
+
+  const tagline = fadeUp(frame, fps, 58, 14);
+  const logoReveal     = fadeUp(frame, fps, 70, 12);
+  const showNameReveal = fadeUp(frame, fps, 76, 12);
 
   return (
     <AbsoluteFill
       style={{
-        backgroundColor: COLORS.bg,
-        justifyContent: 'center',
-        alignItems: 'center',
-        flexDirection: 'column',
+        backgroundColor: colors.primary,
         opacity: sceneOpacity,
         overflow: 'hidden',
       }}
     >
-      {/* Subtle radial */}
+      {/* Subtle radial darker corners — uses brand navy tint */}
       <AbsoluteFill
         style={{
-          background: `radial-gradient(ellipse at center, ${branding.primaryColor}10 0%, ${COLORS.bg} 65%)`,
+          background: `radial-gradient(ellipse at center, transparent 40%, ${colors.navy}30 100%)`,
+          pointerEvents: 'none',
+          opacity: bgPulse - 0.96,
         }}
       />
 
-      {/* Logo */}
-      <div
+      {/* Quiet diagonal sheen */}
+      <AbsoluteFill
         style={{
-          opacity: logo.opacity,
-          transform: `scale(${logo.scale})`,
-          marginBottom: 26,
+          background:
+            'linear-gradient(125deg, rgba(255,255,255,0.08) 0%, transparent 35%, transparent 65%, rgba(0,0,0,0.06) 100%)',
+          pointerEvents: 'none',
         }}
-      >
-        <Img
-          src={branding.logoPath}
-          style={{ width: 90, height: 90, objectFit: 'contain' }}
-        />
-      </div>
+      />
 
-      {/* Show name */}
-      <div
+      {/* Episode title (sits on the gold) */}
+      <AbsoluteFill
         style={{
-          color: COLORS.textPrimary,
-          fontSize: 54,
-          fontWeight: 700,
-          fontFamily: 'Inter, sans-serif',
-          letterSpacing: nameLetterSpacing,
-          textAlign: 'center',
-          lineHeight: 1.1,
-          maxWidth: '70%',
-        }}
-      >
-        {showWords.map((word, i) => (
-          <span
-            key={i}
-            style={{
-              ...wordStaggerStyle(frame, fps, i, 18, TIMING.staggerWord, 12),
-              marginRight: i === showWords.length - 1 ? 0 : '0.32em',
-            }}
-          >
-            {word}
-          </span>
-        ))}
-      </div>
-
-      {/* Hairline rule */}
-      <div
-        style={{
-          width: 200,
-          height: 1,
-          backgroundColor: COLORS.hairline,
-          margin: '24px 0 22px',
-          overflow: 'hidden',
-          opacity: ruleOpacity,
+          justifyContent: 'center',
+          alignItems: 'center',
+          flexDirection: 'column',
+          padding: '0 8%',
         }}
       >
         <div
           style={{
-            width: `${ruleProgress * 100}%`,
-            height: '100%',
-            backgroundColor: branding.primaryColor,
+            opacity: titleOpacity,
+            transform: `translateY(${titleSpring}px)`,
+            color: colors.textNavy,
+            fontFamily: fonts.display,
+            fontSize: 78,
+            fontWeight: 900,
+            letterSpacing: '-0.02em',
+            textAlign: 'center',
+            lineHeight: 1.05,
+            marginBottom: 36,
           }}
-        />
-      </div>
+        >
+          {episode.title}
+        </div>
 
-      {/* Episode title */}
+        {/* CTA pill — episode.number drives the text */}
+        <div
+          style={{
+            opacity: pillOpacity,
+            transform: `scale(${pillScale}) rotate(${pillRotation}deg)`,
+            transformOrigin: 'center center',
+            backgroundColor: colors.navy,
+            color: colors.textCream,
+            fontFamily: fonts.body,
+            fontSize: 14,
+            fontWeight: 700,
+            letterSpacing: '0.42em',
+            textTransform: 'uppercase',
+            padding: '12px 28px',
+            paddingLeft: '32px',
+            borderRadius: 999,
+            boxShadow: `0 12px 24px ${colors.navy}40`,
+          }}
+        >
+          {episode.number}
+        </div>
+
+        {/* Tagline (optional) */}
+        {branding.tagline && (
+          <div
+            style={{
+              opacity: tagline.opacity * 0.85,
+              transform: `translateY(${tagline.y}px)`,
+              marginTop: 28,
+              color: colors.textNavy,
+              fontFamily: fonts.body,
+              fontSize: 18,
+              fontWeight: 500,
+              letterSpacing: '0.08em',
+              textAlign: 'center',
+            }}
+          >
+            {branding.tagline}
+          </div>
+        )}
+      </AbsoluteFill>
+
+      {/* Bottom: logo + show name */}
       <div
         style={{
-          opacity: title.opacity,
-          transform: `translateY(${title.y}px)`,
-          color: COLORS.textSecondary,
-          fontSize: 22,
-          fontWeight: 400,
-          fontFamily: 'Inter, sans-serif',
-          letterSpacing: '0.005em',
-          textAlign: 'center',
-          maxWidth: '60%',
-          lineHeight: 1.4,
-          marginBottom: 28,
+          position: 'absolute',
+          bottom: 40,
+          left: 0,
+          right: 0,
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          gap: 14,
         }}
       >
-        {episode.title}
+        <div
+          style={{
+            opacity: logoReveal.opacity,
+            transform: `translateY(${logoReveal.y}px)`,
+            width: 38,
+            height: 38,
+          }}
+        >
+          <Img
+            src={branding.logoPath}
+            style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+          />
+        </div>
+        <div
+          style={{
+            opacity: showNameReveal.opacity,
+            transform: `translateY(${showNameReveal.y}px)`,
+            color: colors.textNavy,
+            fontFamily: fonts.body,
+            fontSize: 14,
+            fontWeight: 700,
+            letterSpacing: '0.32em',
+            textTransform: 'uppercase',
+          }}
+        >
+          {branding.showName}
+        </div>
       </div>
-
-      {/* Available now — clean fade-up only, no pulsing. */}
-      <div
-        style={{
-          opacity: cta.opacity,
-          transform: `translateY(${cta.y}px)`,
-          color: branding.primaryColor,
-          fontSize: 13,
-          fontWeight: 600,
-          fontFamily: 'Inter, sans-serif',
-          letterSpacing: '0.42em',
-          textTransform: 'uppercase',
-          paddingLeft: '0.42em',
-        }}
-      >
-        Available Now
-      </div>
-
-      {/* Vignette */}
-      <AbsoluteFill
-        style={{
-          background:
-            'radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,0.6) 100%)',
-          pointerEvents: 'none',
-        }}
-      />
     </AbsoluteFill>
   );
 };

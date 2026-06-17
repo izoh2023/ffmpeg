@@ -1,168 +1,215 @@
 import React from 'react';
 import {
   AbsoluteFill,
+  interpolate,
   useCurrentFrame,
   useVideoConfig,
   Img,
 } from 'remotion';
-import { BrandingProp, EpisodeProp } from '../types';
+import { ResolvedBranding, EpisodeProp, MotionProp } from '../types';
 import {
-  COLORS,
-  TIMING,
-  cardReveal,
-  fadeUp,
+  EASE_EXPO_OUT,
+  fadeIn,
   fadeOut,
-  letterSpacingSettle,
-  drawIn,
-  splitWords,
-  wordStaggerStyle,
+  fadeUp,
+  logoSlam,
+  typewriterChars,
 } from './utils/animations';
 
 interface IntroProps {
-  branding: BrandingProp;
+  branding: ResolvedBranding;
   episode: EpisodeProp;
+  motion: MotionProp;
 }
 
 /**
- * Cinematic intro.
- *
- * Beats:
- *   00–06f  near-black hold
- *   06–28f  logo reveal (scale 0.96 → 1, fade)
- *   14–34f  hairline draws in
- *   18–44f  show name fades up; words stagger; letter-spacing settles
- *   34–54f  episode line fades up
- *   78–90f  fade to black
+ * Scene 1 — Logo entrance + show-name typewriter.
+ * All colors / fonts / copy come from `branding` props (theme-driven).
  */
-export const Intro: React.FC<IntroProps> = ({ branding, episode }) => {
+export const Intro: React.FC<IntroProps> = ({ branding, episode, motion }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
-  const introDuration = 3 * fps;
+  const introDuration = 4 * fps; // 120f
 
-  // Logo — subtle scale + fade.
-  const logo = cardReveal(frame, fps, 6, 0.96);
+  const { colors, fonts, copy } = branding;
 
-  // Hairline accent — draws in beneath logo.
-  const hairlineProgress = drawIn(frame, 14, TIMING.introLong);
-  const hairlineOpacity = fadeUp(frame, fps, 14, 6).opacity;
+  // ─── Logo slam ──────────────────────────────────────────────────────────
+  const logo = logoSlam(frame, fps, 4, 7.0);
 
-  // Show name — word stagger + vertical drift + letter-spacing settle.
-  const showWords = splitWords(branding.showName);
-  const nameLetterSpacing = letterSpacingSettle(frame, 18, 0.08, -0.02);
+  // ─── Radial light sweep across the logo ─────────────────────────────────
+  const sweepRotation = interpolate(frame, [18, 38], [0, 360], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+  });
+  const sweepOpacity = interpolate(frame, [18, 22, 34, 38], [0, 0.18, 0.18, 0], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+  });
 
-  // Episode line — last to arrive.
-  const episodeReveal = fadeUp(frame, fps, 34, 8);
+  // ─── Show name typewriter ───────────────────────────────────────────────
+  const TYPE_START = 34;
+  const FRAMES_PER_CHAR = 3;
+  const visibleChars = typewriterChars(frame, branding.showName.length, TYPE_START, FRAMES_PER_CHAR);
+  const typedText = branding.showName.slice(0, visibleChars);
+  const typingDone = visibleChars >= branding.showName.length;
+  const typingDoneAt = TYPE_START + branding.showName.length * FRAMES_PER_CHAR;
+  const cursorBlink = Math.floor((frame - TYPE_START) / 10) % 2 === 0;
+  const cursorVisible = frame >= TYPE_START
+    && (!typingDone || (typingDone && frame < typingDoneAt + 24 && cursorBlink));
 
-  // Outro — clean fade to black at the very end.
-  const fade = fadeOut(frame, introDuration - TIMING.fadeBlackOut, TIMING.fadeBlackOut);
+  const typeBlockOpacity = fadeIn(frame, TYPE_START, 6);
+  const hostReveal      = fadeUp(frame, fps, 58, 10);
+  const episodeReveal   = fadeUp(frame, fps, 38, 8);
+
+  const smashCut = fadeOut(frame, introDuration - 14, 14);
+  const vignetteOpacity = fadeIn(frame, 0, 30);
 
   return (
     <AbsoluteFill
       style={{
-        backgroundColor: COLORS.bg,
+        backgroundColor: '#000000', // the *one* pure-black moment in the trailer
         justifyContent: 'center',
         alignItems: 'center',
         flexDirection: 'column',
-        opacity: fade,
+        opacity: smashCut,
         overflow: 'hidden',
       }}
     >
-      {/* Subtle radial — grounds the composition without competing. */}
+      {/* Subtle radial — tinted by the brand primary */}
       <AbsoluteFill
         style={{
-          background: `radial-gradient(ellipse at center, ${branding.primaryColor}10 0%, ${COLORS.bg} 65%)`,
+          background: `radial-gradient(ellipse at center, ${colors.primary}14 0%, #000 70%)`,
+          opacity: vignetteOpacity,
         }}
       />
 
-      {/* Logo */}
+      {/* Logo + sweep */}
       <div
         style={{
+          position: 'relative',
+          width: 220,
+          height: 220,
+          marginBottom: 38,
           opacity: logo.opacity,
           transform: `scale(${logo.scale})`,
-          marginBottom: 28,
+          filter: `blur(${logo.blurPx}px)`,
+          willChange: 'transform, filter',
         }}
       >
         <Img
           src={branding.logoPath}
-          style={{
-            width: 96,
-            height: 96,
-            objectFit: 'contain',
-          }}
+          style={{ width: '100%', height: '100%', objectFit: 'contain' }}
         />
-      </div>
-
-      {/* Show name — word-staggered, letter-spacing settles. */}
-      <div
-        style={{
-          color: COLORS.textPrimary,
-          fontSize: 58,
-          fontWeight: 700,
-          fontFamily: 'Inter, sans-serif',
-          letterSpacing: nameLetterSpacing,
-          textAlign: 'center',
-          lineHeight: 1.1,
-          maxWidth: '70%',
-        }}
-      >
-        {showWords.map((word, i) => (
-          <span
-            key={i}
-            style={{
-              ...wordStaggerStyle(frame, fps, i, 18, TIMING.staggerWord, 12),
-              marginRight: i === showWords.length - 1 ? 0 : '0.32em',
-            }}
-          >
-            {word}
-          </span>
-        ))}
-      </div>
-
-      {/* Hairline accent */}
-      <div
-        style={{
-          width: 200,
-          height: 1,
-          backgroundColor: COLORS.hairline,
-          margin: '24px 0 18px',
-          overflow: 'hidden',
-          opacity: hairlineOpacity,
-        }}
-      >
         <div
           style={{
-            width: `${hairlineProgress * 100}%`,
-            height: '100%',
-            backgroundColor: branding.primaryColor,
+            position: 'absolute',
+            inset: -20,
+            borderRadius: '50%',
+            background: `conic-gradient(from ${sweepRotation}deg,
+                          transparent 0deg,
+                          rgba(255,255,255,0.85) 40deg,
+                          transparent 90deg,
+                          transparent 360deg)`,
+            mixBlendMode: 'screen',
+            opacity: sweepOpacity,
+            pointerEvents: 'none',
           }}
         />
       </div>
 
-      {/* Episode marker — quiet, restrained. */}
+      {/* Episode marker eyebrow */}
       <div
         style={{
           opacity: episodeReveal.opacity,
           transform: `translateY(${episodeReveal.y}px)`,
-          color: COLORS.textTertiary,
+          color: colors.primary,
+          fontFamily: fonts.body,
           fontSize: 13,
-          fontWeight: 500,
-          fontFamily: 'Inter, sans-serif',
+          fontWeight: 700,
           letterSpacing: '0.42em',
           textTransform: 'uppercase',
-          paddingLeft: '0.42em', // optical balance for tracked uppercase
+          marginBottom: 18,
+          paddingLeft: '0.42em',
         }}
       >
-        Episode · {episode.number}
+        {copy.episodePrefix} {episode.number}
       </div>
 
-      {/* Vignette — texture only, never theatrical. */}
+      {/* Show name — typewriter */}
+      <div
+        style={{
+          opacity: typeBlockOpacity,
+          color: colors.textCream,
+          fontFamily: fonts.display,
+          fontSize: 72,
+          fontWeight: 700,
+          letterSpacing: '0',
+          textAlign: 'center',
+          lineHeight: 1.05,
+          display: 'flex',
+          alignItems: 'baseline',
+          minHeight: 80,
+        }}
+      >
+        <span>{typedText}</span>
+        <span
+          style={{
+            display: 'inline-block',
+            width: 4,
+            height: '0.82em',
+            marginLeft: 6,
+            background: colors.primary,
+            opacity: cursorVisible ? 1 : 0,
+            transform: 'translateY(0.06em)',
+          }}
+        />
+      </div>
+
+      {/* Host slate (optional) */}
+      {branding.hostName && (
+        <div
+          style={{
+            opacity: hostReveal.opacity,
+            transform: `translateY(${hostReveal.y}px)`,
+            color: colors.textCreamDim,
+            fontFamily: fonts.body,
+            fontSize: 14,
+            fontWeight: 400,
+            letterSpacing: '0.32em',
+            textTransform: 'uppercase',
+            marginTop: 28,
+            paddingLeft: '0.32em',
+          }}
+        >
+          {copy.withHost} {branding.hostName}
+        </div>
+      )}
+
+      {/* Vignette */}
       <AbsoluteFill
         style={{
           background:
-            'radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,0.55) 100%)',
+            'radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,0.7) 100%)',
           pointerEvents: 'none',
         }}
       />
+
+      {/* Brand-colored bloom on the slam landing (hype only) */}
+      {motion.energy === 'hype' && (
+        <AbsoluteFill
+          style={{
+            background:
+              `radial-gradient(ellipse at center, ${colors.primary}55 0%, transparent 60%)`,
+            opacity: interpolate(frame, [26, 32, 44], [0, 0.55, 0], {
+              extrapolateLeft: 'clamp',
+              extrapolateRight: 'clamp',
+              easing: EASE_EXPO_OUT,
+            }),
+            mixBlendMode: 'screen',
+            pointerEvents: 'none',
+          }}
+        />
+      )}
     </AbsoluteFill>
   );
 };

@@ -15,9 +15,11 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@remotion/animation-utils": "4.0.290",
     "@remotion/cli": "4.0.290",
     "@remotion/renderer": "4.0.290",
     "archiver": "^7.0.1",
+    "axios": "^1.18.0",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
     "fluent-ffmpeg": "^2.1.3",
