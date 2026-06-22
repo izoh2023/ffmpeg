@@ -10,6 +10,9 @@ services:
       - PORT=9000
       - JOBS_DIR=/tmp/jobs
       - NODE_ENV=production
+      # Shared bearer token required for state-changing requests. Set this in
+      # your shell/.env (compose substitutes it) — do NOT hardcode the secret.
+      - RENDER_API_TOKEN=${RENDER_API_TOKEN}
     volumes:
       # Named volume for the jobs/working dir to avoid permission issues
       - jobs-data:/tmp/jobs
