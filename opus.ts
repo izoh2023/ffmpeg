@@ -4,6 +4,7 @@ import path from "node:path";
 import { promises as fsPromises } from "fs";
 import renderTrailerRouter from "./api/renderTrailer/route";
 import { JOBS_DIR } from './utils/configs';
+import { requireApiToken } from './utils/auth';
 import v_stack, { processProcessVideoJob } from './api/v_stack/route';
 import overlay, { processOverlayJob } from './api/overlay/route';
 import subtitle, { processSubtitleJob } from './api/subtitle/route';
@@ -43,6 +44,12 @@ app.use((req, res, next) => {
     }
     next();
 });
+
+// Shared-bearer-token auth. Protects every state-changing request (POST/PUT/
+// PATCH/DELETE) across all routers; safe GET/HEAD/OPTIONS requests pass through
+// (downloads/status are gated by the unguessable job UUID, /health stays open
+// for Render health checks). See utils/auth.ts.
+app.use(requireApiToken);
 
 app.use('/static', (req, res, next) => {
     res.setHeader('Accept-Ranges', 'bytes');

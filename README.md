@@ -68,26 +68,59 @@ npm run remotion:render    # render the Trailer composition to out/trailer.mp4
 
 ## Configuration
 
-| Variable    | Default      | Description                          |
-| ----------- | ------------ | ------------------------------------ |
-| `PORT`      | `9000`       | HTTP port                            |
-| `JOBS_DIR`  | `/tmp/jobs`  | Jobs / working directory             |
+| Variable           | Default      | Description                                                  |
+| ------------------ | ------------ | ------------------------------------------------------------ |
+| `PORT`             | `9000`       | HTTP port                                                    |
+| `JOBS_DIR`         | `/tmp/jobs`  | Jobs / working directory                                     |
+| `RENDER_API_TOKEN` | _(required)_ | Shared bearer token for service-to-service auth (see below)  |
 
 Copy `.env.example` to `.env` for local reference. `.env` is gitignored — never
 commit secrets.
 
+## Authentication
+
+Calls from other apps are authenticated with a **shared bearer token**. Set the
+`RENDER_API_TOKEN` secret on this service (Render dashboard → Environment), and
+have the calling app send it on every state-changing request:
+
+```
+Authorization: Bearer <RENDER_API_TOKEN>
+```
+
+Generate a strong value once, e.g. `openssl rand -hex 32`, and store the same
+value on both sides.
+
+What is protected (enforced by a single middleware in `utils/auth.ts`, wired in
+`opus.ts`):
+
+- **Protected:** all state-changing requests — `POST` (start a job),
+  `PUT`/`PATCH`, and the `DELETE` cleanup endpoints. Missing/invalid token →
+  `401 Unauthorized`. If `RENDER_API_TOKEN` is not configured on the server,
+  protected requests get `503` (fail-closed — auth is never silently disabled).
+- **Open:** safe `GET`/`HEAD` reads (`/status/:jobId`, `/download/:jobId`,
+  `/files`, `/file`, and the `/static` mount) and `/health`. These reads are
+  gated by the **unguessable job UUID** returned from the authenticated `POST`,
+  so a download URL is only reachable after a request that already passed auth.
+  `OPTIONS` is also open so CORS preflight is not blocked.
+
+Always call over HTTPS so the token is never sent in the clear.
+
 ## HTTP endpoints (mounted in `opus.ts`)
 
-| Mount path         | Purpose                          |
-| ------------------ | -------------------------------- |
-| `/upload-video`    | Upload a source video            |
-| `/full_interview`  | Full interview processing        |
-| `/process-video`   | Vertical/horizontal stacking     |
-| `/overlay-video`   | Overlays                         |
-| `/subtitle-video`  | Subtitles                        |
-| `/clip-video`      | Clip extraction                  |
-| `/render-trailer`  | Remotion trailer render          |
-| `/swap-logo`       | Logo detection + swap            |
-| `/remove`          | Cleanup                          |
-| `/health`          | Health check                     |
-| `/static`          | Serves files from `JOBS_DIR`     |
+| Mount path         | Purpose                          | Auth (POST/DELETE) |
+| ------------------ | -------------------------------- | ------------------ |
+| `/upload-video`    | Upload a source video            | 🔒 Bearer token    |
+| `/full_interview`  | Full interview processing        | 🔒 Bearer token    |
+| `/process-video`   | Vertical/horizontal stacking     | 🔒 Bearer token    |
+| `/overlay-video`   | Overlays                         | 🔒 Bearer token    |
+| `/subtitle-video`  | Subtitles                        | 🔒 Bearer token    |
+| `/clip-video`      | Clip extraction                  | 🔒 Bearer token    |
+| `/render-trailer`  | Remotion trailer render          | 🔒 Bearer token    |
+| `/swap-logo`       | Logo detection + swap            | 🔒 Bearer token    |
+| `/remove`          | Cleanup (DELETE)                 | 🔒 Bearer token    |
+| `/health`          | Health check                     | Public             |
+| `/static`          | Serves files from `JOBS_DIR`     | Public (GET)       |
+
+> 🔒 = state-changing methods require `Authorization: Bearer <RENDER_API_TOKEN>`.
+> The `GET` status/download reads on these same routers are open (gated by the
+> job UUID). See [Authentication](#authentication).
