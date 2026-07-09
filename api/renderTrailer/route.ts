@@ -4,6 +4,7 @@ import path from "path";
 import { execSync } from "child_process";
 import { v4 as uuidv4 } from "uuid";
 import { renderTrailer } from "../../remotion/render";
+import { detectBeats } from "../../utils/beatDetection";
 
 const router = express.Router();
 
@@ -24,9 +25,19 @@ interface RenderRequest {
     jobId: string;
     files: ClipFile[];
   };
-  guest:    { name: string; title: string; company: string };
-  episode:  { title: string; number: string };
+  guest:    { name: string; title: string; company: string; photoPath: string; linkedIn?: string };
+  episode:  {
+    title: string;
+    number: string;
+    pullQuote: string;
+    pullQuoteAttribution: string;
+    pullQuoteHighlights?: string[];
+  };
   branding: { primaryColor: string; logoPath: string; showName: string; musicPath?: string };
+  /** Energy/color-grade preset for the render. Defaults to a safe preset if omitted. */
+  motion?: { energy: "calm" | "hype" | "cinematic"; colorGrade?: "warm" | "cool" | "neutral" };
+  /** Seconds into the track to begin. Auto-detected from the music's beat energy if omitted. */
+  musicTrimStart?: number;
 }
 
 interface RenderJob {
@@ -72,7 +83,7 @@ async function runRenderJob(jobId: string, request: RenderRequest) {
   writeJob(jobId, job);
 
   try {
-    const { clips: clipsPayload, guest, episode, branding } = request;
+    const { clips: clipsPayload, guest, episode, branding, motion, musicTrimStart } = request;
 
     const clips = clipsPayload.files.map((f) => {
       const absolutePath = path.join(JOBS_DIR, clipsPayload.jobId, "clips", f.fileName);
@@ -96,13 +107,32 @@ async function runRenderJob(jobId: string, request: RenderRequest) {
     // Output file sits alongside job.json in the render job dir
     const outputFile = path.join(JOBS_DIR, jobId, `${jobId}.mp4`);
 
+    // Analyze the source music for beats so the trailer's cuts, pulses and
+    // glows can react to it. Best-effort: a bad/missing audio file falls
+    // back to the original fixed-timing animations, it never fails the render.
+    let beats: { bpm: number; beatTimesSec: number[]; suggestedTrimStart: number } | null = null;
+    if (branding.musicPath && fs.existsSync(branding.musicPath)) {
+      try {
+        beats = await detectBeats(branding.musicPath);
+        console.log(
+          `[${jobId}] Beat detection: ${beats.beatTimesSec.length} beats, ~${beats.bpm} BPM`
+        );
+      } catch (err) {
+        console.warn(`[${jobId}] Beat detection failed, using static timing:`, err);
+      }
+    }
+
     await renderTrailer(
       {
         clips,
         guest,
         episode,
         branding,
+        motion: motion ?? { energy: "cinematic", colorGrade: "neutral" },
         musicPath: branding.musicPath ?? "",
+        musicTrimStart: musicTrimStart ?? beats?.suggestedTrimStart ?? 0,
+        musicBeats: beats?.beatTimesSec ?? [],
+        musicBpm: beats?.bpm,
       },
       outputFile,
       (progress) => {

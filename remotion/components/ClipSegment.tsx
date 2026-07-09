@@ -7,7 +7,7 @@ import {
   Video,
 } from 'remotion';
 import { ClipProp, ResolvedBranding, GuestProp, MotionProp } from '../types';
-import { EASE_EXPO_OUT, zoomPush } from './utils/animations';
+import { EASE_EXPO_OUT, zoomPush, beatPulse } from './utils/animations';
 
 interface ClipSegmentProps {
   clip: ClipProp;
@@ -18,6 +18,8 @@ interface ClipSegmentProps {
   totalClips: number;
   /** First clip in the sequence — gets the broadcast-style guest attribution. */
   isFirst?: boolean;
+  /** Beat frames (local to this clip's Sequence) to punch/flash on. */
+  beatFrames?: number[];
 }
 
 /**
@@ -31,6 +33,7 @@ export const ClipSegment: React.FC<ClipSegmentProps> = ({
   motion,
   clipIndex,
   isFirst = false,
+  beatFrames = [],
 }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
@@ -51,7 +54,12 @@ export const ClipSegment: React.FC<ClipSegmentProps> = ({
   const opacity = Math.min(sceneIn, sceneOut);
 
   const ZOOM_START = clipDuration - 10;
-  const zoom = zoomPush(frame, ZOOM_START, 10, 1.05);
+  const endZoom = zoomPush(frame, ZOOM_START, 10, 1.05);
+
+  // Music-reactive punch-in: a quick, tiny extra scale bump on every beat so
+  // the footage feels cut to the track rather than just laid under it.
+  const beatPunch = beatPulse(frame, beatFrames, 2, 8);
+  const zoom = endZoom * (1 + beatPunch * 0.012);
 
   const borderProgress = interpolate(frame, [14, 32], [0, 1], {
     extrapolateLeft: 'clamp',
@@ -138,7 +146,7 @@ export const ClipSegment: React.FC<ClipSegmentProps> = ({
               backgroundColor: colors.primary,
               transform: `scaleY(${borderProgress})`,
               transformOrigin: 'top center',
-              boxShadow: `0 0 10px ${colors.primary}88`,
+              boxShadow: `0 0 ${10 + beatPunch * 14}px ${colors.primary}88`,
             }}
           />
 
@@ -214,6 +222,16 @@ export const ClipSegment: React.FC<ClipSegmentProps> = ({
           }}
         />
       )}
+
+      {/* Beat flash — a faint white lift on every beat, felt more than seen. */}
+      <AbsoluteFill
+        style={{
+          backgroundColor: '#ffffff',
+          opacity: beatPunch * 0.05,
+          mixBlendMode: 'overlay',
+          pointerEvents: 'none',
+        }}
+      />
     </AbsoluteFill>
   );
 };

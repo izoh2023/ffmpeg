@@ -9,12 +9,15 @@ import { ResolvedBranding, MotionProp } from '../types';
 import {
   EASE_EXPO_OUT,
   typewriterChars,
+  beatPulse,
 } from './utils/animations';
 
 interface TransitionProps {
   title: string;
   branding: ResolvedBranding;
   motion: MotionProp;
+  /** Beat frames (local to this transition's Sequence). */
+  beatFrames?: number[];
 }
 
 /**
@@ -39,11 +42,28 @@ interface TransitionProps {
  * Adaptive typing speed: longer titles run at 1 frame/char (max speed),
  * shorter titles get slower per-char so the typing always feels deliberate.
  */
-export const Transition: React.FC<TransitionProps> = ({ title, branding, motion }) => {
+export const Transition: React.FC<TransitionProps> = ({ title, branding, motion, beatFrames = [] }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const TOTAL = Math.round(3.4 * fps); // 102f — matches TRANSITION_FRAMES
   const { colors, fonts, copy } = branding;
+
+  // Beat-reactive glow on the eyebrow dot, plus a one-shot diagonal light
+  // sweep timed to the card's first beat (falls back to a fixed frame so
+  // the card still feels alive when no beat data is available).
+  const beatPunch = beatPulse(frame, beatFrames, 2, 16);
+  const sweepAnchor = beatFrames[0] ?? 14;
+  const sweepX = interpolate(frame, [sweepAnchor, sweepAnchor + 34], [-25, 125], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+    easing: EASE_EXPO_OUT,
+  });
+  const sweepOpacity = interpolate(
+    frame,
+    [sweepAnchor, sweepAnchor + 10, sweepAnchor + 34],
+    [0, 0.5, 0],
+    { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
+  );
 
   // ─── Scene fades ────────────────────────────────────────────────────────
   const sceneIn = interpolate(frame, [0, 14], [0, 1], {
@@ -158,6 +178,16 @@ export const Transition: React.FC<TransitionProps> = ({ title, branding, motion 
         }}
       />
 
+      {/* Diagonal light sweep — timed to the card's first beat */}
+      <AbsoluteFill
+        style={{
+          background: `linear-gradient(100deg, transparent ${sweepX - 15}%, ${colors.primary}30 ${sweepX}%, transparent ${sweepX + 15}%)`,
+          opacity: sweepOpacity,
+          mixBlendMode: 'screen',
+          pointerEvents: 'none',
+        }}
+      />
+
       {/* Eyebrow: ● UP NEXT */}
       <div
         style={{
@@ -174,8 +204,8 @@ export const Transition: React.FC<TransitionProps> = ({ title, branding, motion 
             width: 8,
             height: 8,
             backgroundColor: colors.primary,
-            boxShadow: `0 0 12px ${colors.primary}aa`,
-            transform: `scale(${dotScale})`,
+            boxShadow: `0 0 ${12 + beatPunch * 16}px ${colors.primary}aa`,
+            transform: `scale(${dotScale * (1 + beatPunch * 0.35)})`,
           }}
         />
         <div

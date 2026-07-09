@@ -10,6 +10,7 @@ import {
 import { TrailerProps, TrailerBeat } from '../types';
 import { buildTimeline } from '../utils/timing';
 import { resolveBranding } from '../utils/branding';
+import { beatFramesInWindow, beatsWithin } from '../utils/beats';
 import { EASE_EXPO_OUT } from '../components/utils/animations';
 import { useFonts } from '../components/useFonts';
 import { Intro } from '../components/Intro';
@@ -25,7 +26,7 @@ const MUSIC_DUCKED  = 0.30;  // under the pull quote
 const MUSIC_CLIPS   = 0.18;  // quieter under speech-heavy clips
 
 export const Trailer: React.FC<TrailerProps> = (props) => {
-  const { clips, guest, episode, branding, motion, musicPath, musicTrimStart } = props;
+  const { clips, guest, episode, branding, motion, musicPath, musicTrimStart, musicBeats, musicBpm } = props;
   const frame = useCurrentFrame();
   const { fps, durationInFrames } = useVideoConfig();
 
@@ -36,6 +37,16 @@ export const Trailer: React.FC<TrailerProps> = (props) => {
   const resolvedBranding = resolveBranding(branding);
 
   const timeline = buildTimeline(props);
+
+  // Absolute-second beat data → trailer-timeline frame numbers, once, so
+  // every scene just gets the slice of beats that fall inside its own beat.
+  const beatFrames = beatFramesInWindow(
+    musicBeats,
+    musicBpm,
+    musicTrimStart ?? 0,
+    fps,
+    timeline.totalFrames
+  );
 
   // ─── Anchor points for the music curve ──────────────────────────────────
   const introEnd       = timeline.intro.start + timeline.intro.duration;
@@ -128,6 +139,7 @@ export const Trailer: React.FC<TrailerProps> = (props) => {
               clipIndex={idx}
               totalClips={clips.length}
               isFirst={beat.isFirst}
+              beatFrames={beatsWithin(beatFrames, beat.start, beat.start + beat.duration)}
             />
           </Sequence>
         );
@@ -140,6 +152,7 @@ export const Trailer: React.FC<TrailerProps> = (props) => {
               title={beat.title ?? ''}
               branding={resolvedBranding}
               motion={motion}
+              beatFrames={beatsWithin(beatFrames, beat.start, beat.start + beat.duration)}
             />
           </Sequence>
         );
@@ -147,7 +160,11 @@ export const Trailer: React.FC<TrailerProps> = (props) => {
       case 'pullQuote':
         return (
           <Sequence key={key} from={beat.start} durationInFrames={beat.duration}>
-            <PullQuote episode={episode} branding={resolvedBranding} />
+            <PullQuote
+              episode={episode}
+              branding={resolvedBranding}
+              beatFrames={beatsWithin(beatFrames, beat.start, beat.start + beat.duration)}
+            />
           </Sequence>
         );
 

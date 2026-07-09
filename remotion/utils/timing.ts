@@ -15,6 +15,14 @@ export const PULL_QUOTE_FRAMES   = 6 * FPS;                 // 180f
 export const OUTRO_FRAMES        = 7 * FPS;                 // 210f
 export const FADE_FRAMES         = 12;                       // 0.4s scene edge fade
 
+// Every scene already fades in/out over 14-16 frames at its own edges (see
+// each component's sceneIn/sceneOut). Starting each beat this many frames
+// before the previous one ends makes those fades overlap in time — the
+// incoming scene dissolves in on top of the outgoing one instead of both
+// cutting through a beat of solid color. Kept at-or-under the shortest fade
+// window on every adjacent pair in the timeline so nothing pops.
+export const CROSSFADE_FRAMES = 14;
+
 export const secToFrames = (seconds: number): number =>
   Math.round(seconds * FPS);
 
@@ -26,7 +34,9 @@ export function buildTimeline(props: TrailerProps): TrailerTimeline {
   const push = (b: Omit<TrailerBeat, 'start'>): TrailerBeat => {
     const beat: TrailerBeat = { ...b, start: cursor };
     beats.push(beat);
-    cursor += b.duration;
+    // Advance by less than the full duration so the *next* beat's fade-in
+    // overlaps this beat's fade-out by CROSSFADE_FRAMES (see const above).
+    cursor += b.duration - CROSSFADE_FRAMES;
     return beat;
   };
 
@@ -72,6 +82,8 @@ export function buildTimeline(props: TrailerProps): TrailerTimeline {
     guestCard,
     pullQuote,
     outro,
-    totalFrames: cursor,
+    // Last beat's own end, not `cursor` — cursor is pre-advanced for a
+    // *next* beat's overlap that doesn't exist after the outro.
+    totalFrames: outroBeat.start + outroBeat.duration,
   };
 }

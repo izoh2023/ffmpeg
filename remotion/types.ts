@@ -136,6 +136,8 @@ export interface TrailerProps {
   motion: MotionProp;
   musicPath: string;
   musicTrimStart?: number;         // seconds into the track to begin (hit the drop)
+  musicBeats?: number[];           // absolute-second beat timestamps detected in the source audio
+  musicBpm?: number;               // estimated tempo — used as a synthetic beat grid if musicBeats is empty
 }
 
 // ─── Timing helper ─────────────────────────────────────────────────────────────
