@@ -18,74 +18,83 @@ import { Composition, registerRoot, staticFile } from 'remotion';
 const defaultProps: TrailerProps = {
   clips: [
     {
-      videoPath: staticFile('Finding_the_Balance_Between_AI_and_Authenticity.mp4'),
-      title: 'Finding the Balance Between AI and Authenticity',
-      duration: 8,
-    },
-    {
-      videoPath: staticFile('The_AI_Tool_That_Writes_Your_Workbooks.mp4'),
-      title: 'The AI Tool That Writes Your Workbooks',
+      videoPath: staticFile('What_Happens_When_Technology_Thinks.mp4'),
+      title: 'What Happens When Technology Thinks?',
       duration: 9,
     },
     {
-      videoPath: staticFile('Turning_Podcast_Episodes_into_Workbooks.mp4'),
-      title: 'Turning Podcast Episodes into Workbooks',
+      videoPath: staticFile('Will_AI_Change_Cybersecurity_Forever.mp4'),
+      title: 'Will AI Change Cybersecurity Forever?',
       duration: 9,
     },
+    {
+      videoPath: staticFile('Are_Attackers_Always_One_Step_Ahead.mp4'),
+      title: 'Are Attackers Always One Step Ahead?',
+      duration: 9,
+    },
+    {
+      videoPath: staticFile('Balancing_Speed_and_Governance.mp4'),
+      title: 'Balancing Speed and Governance',
+      duration: 9,
+    },
+    {
+      videoPath: staticFile('AIs_Role_in_Cyber_Defense.mp4'),
+      title: "AI's Role in Cyber Defense",
+      duration: 9,
+    }
   ],
   guest: {
-    name: 'Trent Allday',
-    title: 'AI Content Strategist',
-    company: 'CommTogether',
-    photoPath: staticFile('Anthony_Perl_Profile_Picture.jpg'),
-    linkedIn: 'anthonyperl',
+    name: 'Rajiv Punia',
+    title: 'Founder & Chief Executive',
+    company: 'Shoonya',
+    photoPath: staticFile('Rajiv.png'), // Untouched
+    linkedIn: 'rajivpunia',
   },
   episode: {
-    title: 'How AI Is Eating Content Creation',
+    title: 'The Intersection of AI and OT',
     number: 'Coming Soon',
-    pullQuote:
-      "Don't you want to be the one they're pulling from — so others end up quoting you?",
-    pullQuoteAttribution: '— Anthony Perl',
-    // Words/phrases inside the quote that get highlighted in colors.primary.
+    pullQuote: 'The purpose of cybersecurity is not to remove every priority. It is to stop the business from being compromised.',
+    pullQuoteAttribution: '— Rajiv Punia',
     pullQuoteHighlights: [
-      "they're pulling from",
-      'quoting you',
+      'stop the business',
+      'being compromised',
+      'not to remove every ',
     ],
   },
   branding: {
     // ── Identity ────────────────────────────────────────────────────────────
-    showName: 'MangoMagic',
-    hostName: 'Felipe Zuluaga',
-    tagline: 'Real Conversations. Real AI.',
-    logoPath: staticFile('mango_logo.png'),
+    showName: 'Cyberwins',
+    hostName: 'Hayden Loader',
+    tagline: 'What actually worked in enterprise cybersecurity, and why',
+    logoPath: staticFile('anz_logo.png'), // Untouched
 
-    // ── Colors — every key is optional, defaults shown for reference ──────
+    // ── Colors ──────────────────────────────────────────────────────────────
     colors: {
-      primary:        '#F1AB1C',  // brand accent (lines, highlights, dots)
-      accent:         '#F6F0E2',  // secondary accent
-      background:     '#0a0a0a',  // near-black default scene bg
-      backgroundDeep: '#080808',  // clip segment bg
-      cutBackground:  '#050505',  // transition card bg
-      navy:           '#111527',  // guest card + pull quote bg
-      cream:          '#F6F0E2',  // brand cream
+      primary:        '#C0AAEC', // Updated from JSON
+      accent:         '#F6F0E2',
+      background:     '#0a0a0a',
+      backgroundDeep: '#080808',
+      cutBackground:  '#050505',
+      navy:           '#111527',
+      cream:          '#F6F0E2',
       textPrimary:    '#ffffff',
       textSecondary:  'rgba(255, 255, 255, 0.65)',
       textTertiary:   'rgba(255, 255, 255, 0.42)',
-      textCream:      '#F6F0E2',  // text on navy
+      textCream:      '#F6F0E2',
       textCreamDim:   'rgba(246, 240, 226, 0.65)',
-      textNavy:       '#111527',  // text on gold (Outro)
+      textNavy:       '#111527',
       hairline:       'rgba(255, 255, 255, 0.08)',
     },
 
-    // ── Fonts — install via @remotion/google-fonts or include in index.html
+    // ── Fonts ───────────────────────────────────────────────────────────────
     fonts: {
       display: "'Playfair Display', Georgia, serif",
       body:    "'Montserrat', system-ui, sans-serif",
     },
 
-    // ── Copy — every UI label / prefix is overridable ──────────────────────
+    // ── Copy ────────────────────────────────────────────────────────────────
     copy: {
-      watermark:      '@mangomagic', // pass '' to hide entirely
+      watermark:      '@cyberwins',
       introducing:    'Introducing',
       upNext:         'Up Next',
       availableNow:   'Available Now',
@@ -99,7 +108,7 @@ const defaultProps: TrailerProps = {
     energy: 'hype',
     colorGrade: 'warm',
   },
-  musicPath: staticFile('Anthony Perl.mp3'),
+  musicPath: staticFile('Rajiv Punia.mp3'), // Untouched
   musicTrimStart: 4,
 };
 

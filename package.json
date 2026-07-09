@@ -5,9 +5,9 @@
   "main": "dist/opus.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "nodemon",
+    "dev": "npx nodemon --watch src --ext ts --exec \"ts-node\" opus.ts",
     "build": "tsc",
-    "start": "node dist/opus.js",
+    "start": "node dist/index.js",
     "remotion:studio": "remotion studio remotion/Root.tsx",
     "remotion:render": "remotion render remotion/Root.tsx Trailer out/trailer.mp4"
   },

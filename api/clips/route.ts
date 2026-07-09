@@ -110,7 +110,7 @@ function snapEnd(nominal: number, silences: SilenceRegion[]): number | null {
     return Math.min(best.end, best.start + POSTROLL);
 }
 
-export async function processClipJob(jobId: string, jobDir: string, jobFile: string, job: ClipJobData) {
+export async function processClipJob(jobId: string, jobDir: string, jobFile: string, job: any) {
     console.log(`[Clip Job ${jobId}] Starting Frame-Accurate Cut (concurrency=${CLIP_CONCURRENCY})...`);
 
     const outputDir = path.join(jobDir, "clips");
@@ -127,7 +127,7 @@ export async function processClipJob(jobId: string, jobDir: string, jobFile: str
     const KEYFRAME_SEEK_BUFFER = 30;
     let completed = 0;
 
-    const tasks = job.clips.map((clip, i) => async (): Promise<string | null> => {
+    const tasks = job.clips.map((clip: any, i: number) => async (): Promise<string | null> => {
         const startTime = hhmmssToSeconds(clip.start_ffmpeg);
         const endTime = hhmmssToSeconds(clip.end_ffmpeg);
 
@@ -164,11 +164,16 @@ export async function processClipJob(jobId: string, jobDir: string, jobFile: str
         // boundaries and leaves a priming pop). loudnorm keeps levels consistent
         // across clips; the short afades remove edge clicks. Audio-only — no
         // visual fade, so downstream transitions are unaffected.
-        const fadeOutStart = Math.max(0, duration - 0.06);
+        
+        // --- FIX IS HERE: offset fades by postSeek ---
+        const fadeInStart = postSeek;
+        const actualFadeOutStart = postSeek + Math.max(0, duration - 0.06);
+
         const audioFilter =
             `loudnorm=I=-16:TP=-1.5:LRA=11,` +
-            `afade=t=in:st=0:d=0.04,` +
-            `afade=t=out:st=${fadeOutStart.toFixed(3)}:d=0.06`;
+            `afade=t=in:st=${fadeInStart.toFixed(3)}:d=0.04,` +
+            `afade=t=out:st=${actualFadeOutStart.toFixed(3)}:d=0.06`;
+        // ---------------------------------------------
 
         const args = [
             "-ss", preSeek.toFixed(3),
@@ -214,13 +219,13 @@ clips.post("/", express.json(), async (req, res) => {
     try {
         console.log("===== /clip-video called =====");
 
-        const { videoPath, clips } = req.body;
+        const { videoPath, clips: reqClips } = req.body;
 
         if (!videoPath || !fs.existsSync(videoPath)) {
             res.status(400).json({ error: "Valid videoPath is required" });
             return;
         }
-        if (!clips || !Array.isArray(clips) || clips.length === 0) {
+        if (!reqClips || !Array.isArray(reqClips) || reqClips.length === 0) {
             res.status(400).json({ error: "clips array is required and must not be empty" });
             return;
         }
@@ -230,11 +235,11 @@ clips.post("/", express.json(), async (req, res) => {
 
         fs.mkdirSync(jobDir, { recursive: true });
 
-        const job: ClipJobData = {
+        const job: any = {
             id: jobId,
             status: "pending",
             inputVideo: videoPath,
-            clips: clips.map((c: any) => ({
+            clips: reqClips.map((c: any) => ({
                 title: c.title,
                 start_ffmpeg: c.start_ffmpeg,
                 end_ffmpeg: c.end_ffmpeg,
@@ -280,7 +285,7 @@ clips.get("/status/:jobId", (req, res) => {
         return res.status(404).json({ error: "Job not found" });
     }
 
-    const job: ClipJobData = JSON.parse(fs.readFileSync(jobFile, "utf-8"));
+    const job: any = JSON.parse(fs.readFileSync(jobFile, "utf-8"));
 
     return res.json({
         jobId: job.id,
@@ -299,7 +304,7 @@ clips.get("/files/:jobId", async (req, res) => {
         return res.status(404).json({ error: "Job not found" });
     }
 
-    const job: ClipJobData = JSON.parse(await fsPromises.readFile(jobFile, "utf-8"));
+    const job: any = JSON.parse(await fsPromises.readFile(jobFile, "utf-8"));
 
     if (job.status !== "done") {
         return res.status(400).json({ error: "Job not finished", status: job.status, progress: job.progress ?? 0 });
@@ -309,7 +314,7 @@ clips.get("/files/:jobId", async (req, res) => {
         return res.status(404).json({ error: "No clips found" });
     }
 
-    const files = job.results.map((filePath) => ({
+    const files = job.results.map((filePath: string) => ({
         fileName: path.basename(filePath),
         downloadUrl: `/clip-video/file/${req.params.jobId}/${path.basename(filePath)}`,
     }));
@@ -336,7 +341,7 @@ clips.get("/download/:jobId", async (req, res) => {
         return res.status(404).json({ error: "Job not found" });
     }
 
-    const job: ClipJobData = JSON.parse(await fsPromises.readFile(jobFile, "utf-8"));
+    const job: any = JSON.parse(await fsPromises.readFile(jobFile, "utf-8"));
 
     if (job.status !== "done") {
         return res.status(400).json({ error: "Job not finished" });

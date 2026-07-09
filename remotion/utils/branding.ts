@@ -7,9 +7,6 @@ import {
 } from '../types';
 
 // ─── Default palette ─────────────────────────────────────────────────────────
-// All colors here are overridable per-client via `branding.colors.*`.
-// The defaults reproduce the existing podcast aesthetic so existing trailers
-// keep working when only identity fields are supplied.
 const DEFAULT_COLORS: Required<BrandColors> = {
   primary: '#F1AB1C',
   accent: '#F6F0E2',
@@ -46,34 +43,65 @@ const DEFAULT_COPY: Required<BrandCopy> = {
 /**
  * Merge a user-supplied BrandingProp with defaults to produce a ResolvedBranding.
  *
- * Resolution rules:
  *   • `branding.colors.primary` wins over `branding.primaryColor` (back-compat).
- *   • Any color/font/copy key the user doesn't specify falls back to the default.
- *   • The resolved object has EVERY field populated — components can read
+ *   • Every color/font/copy key falls back to the design-system default.
+ *   • Every field on the result is provably non-undefined — components can read
  *     `branding.colors.navy` etc. without nullable checks.
  *
- * Call this once at the top of the composition; pass the result to every scene.
+ * Per-field nullish-coalescing (instead of object spread) is intentional so
+ * TypeScript's strict mode is satisfied that the result matches
+ * `Required<BrandColors>` etc.
  */
 export const resolveBranding = (b: BrandingProp): ResolvedBranding => {
-  const primary = b.colors?.primary ?? b.primaryColor ?? DEFAULT_COLORS.primary;
-  const accent  = b.colors?.accent  ?? b.accentColor  ?? DEFAULT_COLORS.accent;
+  const c  = b.colors ?? {};
+  const f  = b.fonts  ?? {};
+  const cp = b.copy   ?? {};
+
+  const primary = c.primary ?? b.primaryColor ?? DEFAULT_COLORS.primary;
+  const accent  = c.accent  ?? b.accentColor  ?? DEFAULT_COLORS.accent;
+
+  const colors: Required<BrandColors> = {
+    primary,
+    accent,
+    background:     c.background     ?? DEFAULT_COLORS.background,
+    backgroundDeep: c.backgroundDeep ?? DEFAULT_COLORS.backgroundDeep,
+    cutBackground:  c.cutBackground  ?? DEFAULT_COLORS.cutBackground,
+    navy:           c.navy           ?? DEFAULT_COLORS.navy,
+    cream:          c.cream          ?? DEFAULT_COLORS.cream,
+    textPrimary:    c.textPrimary    ?? DEFAULT_COLORS.textPrimary,
+    textSecondary:  c.textSecondary  ?? DEFAULT_COLORS.textSecondary,
+    textTertiary:   c.textTertiary   ?? DEFAULT_COLORS.textTertiary,
+    textCream:      c.textCream      ?? DEFAULT_COLORS.textCream,
+    textCreamDim:   c.textCreamDim   ?? DEFAULT_COLORS.textCreamDim,
+    textNavy:       c.textNavy       ?? DEFAULT_COLORS.textNavy,
+    hairline:       c.hairline       ?? DEFAULT_COLORS.hairline,
+  };
+
+  const fonts: Required<BrandFonts> = {
+    display: f.display ?? DEFAULT_FONTS.display,
+    body:    f.body    ?? DEFAULT_FONTS.body,
+  };
+
+  const copy: Required<BrandCopy> = {
+    watermark:      cp.watermark      ?? DEFAULT_COPY.watermark,
+    introducing:    cp.introducing    ?? DEFAULT_COPY.introducing,
+    upNext:         cp.upNext         ?? DEFAULT_COPY.upNext,
+    availableNow:   cp.availableNow   ?? DEFAULT_COPY.availableNow,
+    episodePrefix:  cp.episodePrefix  ?? DEFAULT_COPY.episodePrefix,
+    withHost:       cp.withHost       ?? DEFAULT_COPY.withHost,
+    linkedInPrefix: cp.linkedInPrefix ?? DEFAULT_COPY.linkedInPrefix,
+    clipPrefix:     cp.clipPrefix     ?? DEFAULT_COPY.clipPrefix,
+  };
 
   return {
-    showName: b.showName,
-    hostName: b.hostName,
-    tagline: b.tagline,
-    logoPath: b.logoPath,
+    showName:     b.showName,
+    hostName:     b.hostName,
+    tagline:      b.tagline,
+    logoPath:     b.logoPath,
     primaryColor: primary,
-    accentColor: accent,
-    colors: {
-      ...DEFAULT_COLORS,
-      ...b.colors,
-      // Force primary/accent to the resolved values (they may have come from
-      // the back-compat top-level keys, not from `colors`).
-      primary,
-      accent,
-    },
-    fonts: { ...DEFAULT_FONTS, ...b.fonts },
-    copy: { ...DEFAULT_COPY, ...b.copy },
+    accentColor:  accent,
+    colors,
+    fonts,
+    copy,
   };
 };

@@ -12,7 +12,7 @@ import interview from './api/interview/route';
 import uploadRoute from './api/upload/route';
 import cleanup from './api/cleanUp/route';
 import logoSwap, { processLogoSwapJob } from './api/logo_swap/route';
-
+import extractAudio from './api/extractAudio/route';
 
 // Ensure directory exists
 if (!fs.existsSync(JOBS_DIR)) {
@@ -134,6 +134,7 @@ app.use("/clip-video", clips)
 app.use("/render-trailer", renderTrailerRouter);
 app.use('/remove', cleanup)
 app.use("/swap-logo", logoSwap);
+app.use("/extract-audio", extractAudio)
 
 console.log("Starting unified worker loop...");
 worker();

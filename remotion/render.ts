@@ -34,9 +34,17 @@ function getChromiumExecutable(): string | undefined {
 function stageAssets(props: TrailerProps): TrailerProps {
   return {
     ...props,
+    guest: {
+      ...props.guest,
+      photoPath: props.guest.photoPath
+        ? `http://localhost:${EXPRESS_PORT}/static/${path.basename(props.guest.photoPath)}`
+        : '',
+    },
     branding: {
       ...props.branding,
-      logoPath: `http://localhost:${EXPRESS_PORT}/static/${path.basename(props.branding.logoPath)}`,
+      logoPath: props.branding.logoPath
+        ? `http://localhost:${EXPRESS_PORT}/static/${path.basename(props.branding.logoPath)}`
+        : '',
     },
     musicPath: props.musicPath
       ? `http://localhost:${EXPRESS_PORT}/static/${path.basename(props.musicPath)}`
@@ -52,6 +60,8 @@ export async function renderTrailer(
 ): Promise<string> {
 
   const resolvedProps = stageAssets(props);
+
+  console.debug(resolvedProps)
   const inputProps = resolvedProps as unknown as Record<string, unknown>;
 
   console.log('[Remotion] Bundling composition...');

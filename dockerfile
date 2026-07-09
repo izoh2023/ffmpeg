@@ -1,6 +1,10 @@
-FROM node:20-slim AS base
+# syntax=docker/dockerfile:1.7
 
-RUN apt-get update && apt-get install -y \
+# ─── Base — shared OS deps, rarely changes ────────────────────────────────────
+FROM node:20-slim AS base
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update && apt-get install -y \
     ffmpeg \
     fontconfig \
     fonts-dejavu \
@@ -42,8 +46,7 @@ RUN apt-get update && apt-get install -y \
     libxtst6 \
     wget \
     --no-install-recommends \
-    && fc-cache -f \
-    && rm -rf /var/lib/apt/lists/*
+    && fc-cache -f
 
 RUN mkdir -p /usr/share/fonts/truetype/montserrat \
     && wget -q -O /usr/share/fonts/truetype/montserrat/Montserrat-VariableFont_wght.ttf \
@@ -52,44 +55,39 @@ RUN mkdir -p /usr/share/fonts/truetype/montserrat \
        "https://github.com/google/fonts/raw/main/ofl/montserrat/Montserrat-Italic%5Bwght%5D.ttf" \
     && fc-cache -fv
 
+# Create runtime dirs once, in base — production stage never needs chown -R
+RUN mkdir -p /tmp/jobs /tmp/render-jobs /tmp/renders /tmp/music /app && \
+    chown -R node:node /tmp/jobs /tmp/render-jobs /tmp/renders /tmp/music /app
+
 WORKDIR /app
 
-# ─── Dependencies ─────────────────────────────────────────────────────────────
+# ─── Dependencies — cached separately from source code ───────────────────────
 FROM base AS deps
-
 COPY package*.json ./
-RUN npm ci
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci
 
-# Download Remotion's chrome-headless-shell into node_modules/.remotion
-RUN npx remotion browser ensure
+# Cache Remotion's chrome-headless-shell download across builds
+RUN --mount=type=cache,target=/app/node_modules/.remotion \
+    npx remotion browser ensure
 
 # ─── Builder — compile TypeScript ─────────────────────────────────────────────
 FROM deps AS builder
-
-# Copy tsconfig here so changes bust builder cache without re-running npm ci
 COPY tsconfig.json ./
 COPY . .
 RUN npx tsc --outDir dist
 
-# ─── Production ───────────────────────────────────────────────────────────────
+# ─── Production — minimal final image ─────────────────────────────────────────
 FROM base AS production
 
-# node_modules including .remotion chrome binary
-COPY --from=deps /app/node_modules ./node_modules
-
+# node_modules including .remotion chrome binary — owned by node at copy time
+COPY --from=deps --chown=node:node /app/node_modules ./node_modules
 # Compiled JS
-COPY --from=builder /app/dist ./dist
-
+COPY --from=builder --chown=node:node /app/dist ./dist
 # Remotion TSX source — bundle() reads this at runtime, cannot be pre-compiled
-COPY remotion/ ./remotion/
-
-# Face detection script
-COPY face_center.py ./
-COPY detect_logo.py ./
-
-# Create runtime dirs
-RUN mkdir -p /tmp/jobs /tmp/render-jobs /tmp/renders /tmp/music && \
-    chown -R node:node /tmp/jobs /tmp/render-jobs /tmp/renders /tmp/music /app
+COPY --chown=node:node remotion/ ./remotion/
+# Face/logo detection scripts
+COPY --chown=node:node face_center.py detect_logo.py ./
 
 ENV NODE_ENV=production
 ENV CLIP_JOBS_DIR=/tmp/jobs
@@ -98,7 +96,5 @@ ENV OUTPUT_DIR=/tmp/renders
 ENV MUSIC_OUTPUT_DIR=/tmp/music
 
 USER node
-
 EXPOSE 9000
-
 CMD ["node", "dist/opus.js"]

@@ -24,8 +24,20 @@ interface RenderRequest {
     jobId: string;
     files: ClipFile[];
   };
-  guest:    { name: string; title: string; company: string };
-  episode:  { title: string; number: string };
+  guest: {
+    name: string;
+    title: string;
+    company: string;
+    photoPath: string;
+    linkedIn: string;
+  };
+  episode: {
+    title: string;
+    number: string;
+    pullQuote: string;
+    pullQuoteAttribution: string;
+    pullQuoteHighlights: string[];
+  };
   branding: { primaryColor: string; logoPath: string; showName: string; musicPath?: string };
 }
 
@@ -93,23 +105,23 @@ async function runRenderJob(jobId: string, request: RenderRequest) {
 
     console.log(`[${jobId}] Resolved ${clips.length} clips via ${STATIC_BASE}/${clipsPayload.jobId}/clips/`);
 
-    // Output file sits alongside job.json in the render job dir
     const outputFile = path.join(JOBS_DIR, jobId, `${jobId}.mp4`);
 
     await renderTrailer(
-      {
-        clips,
-        guest,
-        episode,
-        branding,
-        musicPath: branding.musicPath ?? "",
-      },
-      outputFile,
-      (progress) => {
-        job.progress = progress;
-        writeJob(jobId, job);
-      }
-    );
+  {
+    clips,
+    guest,
+    episode,
+    branding,
+    motion: { energy: 'hype', colorGrade: 'warm' },
+    musicPath: branding.musicPath ?? "",
+  },
+  outputFile,
+  (progress) => {
+    job.progress = progress;
+    writeJob(jobId, job);
+  }
+);
 
     job.status = "done";
     job.progress = 100;
@@ -129,10 +141,11 @@ async function runRenderJob(jobId: string, request: RenderRequest) {
 router.post("/", (req, res) => {
   const body = req.body as RenderRequest;
 
-  if (!body?.clips?.files?.length) return res.status(400).json({ error: "clips.files is required" });
-  if (!body.guest?.name)           return res.status(400).json({ error: "guest.name is required" });
-  if (!body.episode?.title)        return res.status(400).json({ error: "episode.title is required" });
-  if (!body.branding?.showName)    return res.status(400).json({ error: "branding.showName is required" });
+  if (!body?.clips?.files?.length)      return res.status(400).json({ error: "clips.files is required" });
+  if (!body.guest?.name)                return res.status(400).json({ error: "guest.name is required" });
+  if (!body.episode?.title)             return res.status(400).json({ error: "episode.title is required" });
+  if (!body.episode?.pullQuote)         return res.status(400).json({ error: "episode.pullQuote is required" });
+  if (!body.branding?.showName)         return res.status(400).json({ error: "branding.showName is required" });
 
   const jobId = `render_${Date.now()}_${uuidv4()}`;
   runRenderJob(jobId, body);
