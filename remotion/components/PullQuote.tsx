@@ -9,6 +9,7 @@ import { ResolvedBranding, EpisodeProp } from '../types';
 import {
   EASE_EXPO_OUT,
   breathePulse,
+  beatPulse,
   fadeIn,
   fadeOut,
   fadeUp,
@@ -18,13 +19,15 @@ import {
 interface PullQuoteProps {
   episode: EpisodeProp;
   branding: ResolvedBranding;
+  /** Beat frames (local to this scene's Sequence). */
+  beatFrames?: number[];
 }
 
 /**
  * Scene 4 — Pull quote. Theme-driven; highlight phrases come from
  * `episode.pullQuoteHighlights` so each client can pick their own.
  */
-export const PullQuote: React.FC<PullQuoteProps> = ({ episode, branding }) => {
+export const PullQuote: React.FC<PullQuoteProps> = ({ episode, branding, beatFrames = [] }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const duration = 6 * fps; // 180f
@@ -35,7 +38,9 @@ export const PullQuote: React.FC<PullQuoteProps> = ({ episode, branding }) => {
   const sceneOut = fadeOut(frame, duration - 18, 18);
   const sceneOpacity = Math.min(sceneIn, sceneOut);
 
-  const breathe = breathePulse(frame, fps, 0.005);
+  // Gentle sinusoidal breathing, plus a barely-there lift on each beat so the
+  // card doesn't sit dead-still if the music is still going underneath it.
+  const breathe = breathePulse(frame, fps, 0.005) + beatPulse(frame, beatFrames, 3, 20) * 0.01;
 
   const quoteWords = splitWords(episode.pullQuote);
   const highlightFlags = markHighlightWords(

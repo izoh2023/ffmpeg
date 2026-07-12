@@ -45,6 +45,9 @@ RUN apt-get update && apt-get install -y \
     && fc-cache -f \
     && rm -rf /var/lib/apt/lists/*
 
+# Librosa (beat_detection.py) — pip, not apt, since Debian doesn't package it.
+RUN pip3 install --no-cache-dir --break-system-packages librosa
+
 RUN mkdir -p /usr/share/fonts/truetype/montserrat \
     && wget -q -O /usr/share/fonts/truetype/montserrat/Montserrat-VariableFont_wght.ttf \
        "https://github.com/google/fonts/raw/main/ofl/montserrat/Montserrat%5Bwght%5D.ttf" \

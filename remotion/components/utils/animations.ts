@@ -345,6 +345,41 @@ export const zoomPush = (
   });
 
 /**
+ * Percussive pulse envelope for beat-synced accents (glow, scale bumps).
+ * 0 between beats; snaps to 1 at the nearest beat at-or-before `frame`,
+ * then eases back to 0 over `decay` frames. `beatFrames` must be sorted
+ * ascending (local, Sequence-relative frames — see utils/beats.ts).
+ */
+export const beatPulse = (
+  frame: number,
+  beatFrames: number[],
+  attack: number = 2,
+  decay: number = 10
+): number => {
+  if (!beatFrames.length) return 0;
+
+  let nearest = -Infinity;
+  for (const b of beatFrames) {
+    if (b > frame) break;
+    nearest = b;
+  }
+  if (nearest === -Infinity) return 0;
+
+  const dt = frame - nearest;
+  if (dt <= attack) {
+    return interpolate(dt, [0, attack], [0, 1], {
+      extrapolateLeft: 'clamp',
+      extrapolateRight: 'clamp',
+    });
+  }
+  return interpolate(dt, [attack, attack + decay], [1, 0], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+    easing: EASE_EXPO_OUT,
+  });
+};
+
+/**
  * Slide down from above — for episode title slam in Outro.
  * Returns { y, opacity }.
  */
