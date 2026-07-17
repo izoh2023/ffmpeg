@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc *)",
+      "Bash(ffmpeg -version)",
+      "Read(//d/ffmpeg/**)"
+    ]
+  }
+}

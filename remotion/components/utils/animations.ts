@@ -10,6 +10,7 @@
  *  • Backgrounds: NAVY #111527, near-black #0a0a0a. Never pure #000.
  */
 import { interpolate, spring, SpringConfig, Easing } from 'remotion';
+import type { MotionProp } from '../../types';
 
 // ─── Brand color palette ─────────────────────────────────────────────────────
 export const COLORS = {
@@ -343,6 +344,45 @@ export const zoomPush = (
     extrapolateRight: 'clamp',
     easing: EASE_EXPO_OUT,
   });
+
+/**
+ * Color grade wash — a gradient tint meant to be layered with
+ * `mixBlendMode: 'overlay'` over a scene background or video. Shared across
+ * every scene so `motion.colorGrade` reads consistently trailer-wide.
+ */
+export const colorGradeTint = (
+  grade: MotionProp['colorGrade'],
+  brandPrimary: string
+): string => {
+  switch (grade) {
+    case 'warm':
+      return `linear-gradient(135deg, ${brandPrimary}cc 0%, #c97a1f80 100%)`;
+    case 'cool':
+      return 'linear-gradient(135deg, #3b6fcccc 0%, #0d1f4180 100%)';
+    case 'neutral':
+    default:
+      return 'linear-gradient(135deg, rgba(255,240,220,0.6) 0%, rgba(40,40,40,0.4) 100%)';
+  }
+};
+
+/**
+ * Flash-cut spike — ramps 0 → peak → 0 in a handful of frames. Placed at
+ * the tail of an outgoing scene and the head of the incoming one (both
+ * starting from their own local frame 0), it bridges a hard Sequence cut
+ * with a bright flash frame instead of a plain crossfade.
+ */
+export const flashCut = (
+  frame: number,
+  start: number,
+  peakOpacity: number = 0.85,
+  duration: number = 8
+) =>
+  interpolate(
+    frame,
+    [start, start + duration * 0.35, start + duration],
+    [0, peakOpacity, 0],
+    { extrapolateLeft: 'clamp', extrapolateRight: 'clamp', easing: EASE_EXPO_OUT }
+  );
 
 /**
  * Slide down from above — for episode title slam in Outro.

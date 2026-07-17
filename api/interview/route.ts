@@ -31,6 +31,29 @@ async function probeVideoDimensions(videoPath: string): Promise<{ width: number;
     });
 }
 
+async function probeFps(videoPath: string): Promise<number> {
+    return new Promise((resolve) => {
+        const proc = spawn("ffprobe", [
+            "-v", "error",
+            "-select_streams", "v:0",
+            "-show_entries", "stream=r_frame_rate",
+            "-of", "json",
+            videoPath,
+        ]);
+        let out = "";
+        proc.stdout.on("data", (d) => (out += d.toString()));
+        proc.on("close", () => {
+            try {
+                const rate: string = JSON.parse(out).streams[0].r_frame_rate; // e.g. "30000/1001"
+                const [num, den] = rate.split("/").map(Number);
+                const fps = den ? num / den : num;
+                resolve(fps > 0 && Number.isFinite(fps) ? fps : 30);
+            } catch { resolve(30); }
+        });
+        proc.on("error", () => resolve(30));
+    });
+}
+
 async function detectCrop(
     videoPath: string,
     fallback: { w: number; h: number }
@@ -128,7 +151,13 @@ async function processFullInterviewJob(jobId: string, jobDir: string, jobFile: s
         job.progress = 70;
         await fsPromises.writeFile(jobFile, JSON.stringify(job, null, 2));
 
-        // ── Step 3: concat intro/outro with stream copy (no re-encode) ──
+        // ── Step 3: concat intro/outro via filter (re-encode, not stream copy) ──
+        // -c copy with the concat demuxer only stays in sync if every segment
+        // shares identical codec params (fps, timebase, sample rate, keyframes).
+        // The intro/outro bumpers are produced separately from the interview
+        // recording, so their dimensions and fps rarely match — normalize each
+        // segment (scale/pad to the main video's frame size, force a common fps)
+        // and decode+re-encode through one unified timebase instead.
         const finalOut = path.join(jobDir, "output.mp4");
 
         if (job.introPath || job.outroPath) {
@@ -138,23 +167,32 @@ async function processFullInterviewJob(jobId: string, jobDir: string, jobFile: s
                 ...(job.outroPath ? [job.outroPath] : []),
             ];
 
-            const concatList = path.join(jobDir, "concat.txt");
-            await fsPromises.writeFile(
-                concatList,
-                segments.map(s => `file '${s.replace(/'/g, "'\\''")}'`).join("\n")
-            );
+            const targetFps = await probeFps(job.inputVideo);
 
-            await runCmd("ffmpeg", [
-                "-f", "concat",
-                "-safe", "0",
-                "-i", concatList,
-                "-c", "copy",
+            const ffmpegConcatArgs: string[] = [];
+            segments.forEach(seg => ffmpegConcatArgs.push("-i", seg));
+
+            const perSegmentFilters = segments
+                .map((_, i) =>
+                    `[${i}:v:0]scale=${vw}:${vh}:force_original_aspect_ratio=decrease,` +
+                    `pad=${vw}:${vh}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=${targetFps}[v${i}]`
+                )
+                .join(";");
+            const concatInputs = segments.map((_, i) => `[v${i}][${i}:a:0]`).join("");
+            const filterComplex = `${perSegmentFilters};${concatInputs}concat=n=${segments.length}:v=1:a=1[outv][outa]`;
+
+            ffmpegConcatArgs.push(
+                "-filter_complex", filterComplex,
+                "-map", "[outv]", "-map", "[outa]",
+                "-c:v", "libx264", "-crf", "18", "-preset", "veryfast", "-pix_fmt", "yuv420p",
+                "-c:a", "aac", "-b:a", "128k",
                 "-y",
                 finalOut,
-            ], {}, MAX_PROCESSING_TIME);
+            );
+
+            await runCmd("ffmpeg", ffmpegConcatArgs, {}, MAX_PROCESSING_TIME);
 
             fs.unlink(overlaidOut, () => {});
-            fs.unlink(concatList,  () => {});
         }
 
         job.progress = 90;

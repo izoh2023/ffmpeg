@@ -128,6 +128,11 @@ export interface MotionProp {
   colorGrade?: 'warm' | 'cool' | 'neutral';
 }
 
+export interface VideoOverride {
+  videoPath: string;
+  duration: number; // seconds
+}
+
 export interface TrailerProps {
   clips: ClipProp[];
   guest: GuestProp;
@@ -136,6 +141,20 @@ export interface TrailerProps {
   motion: MotionProp;
   musicPath: string;
   musicTrimStart?: number;         // seconds into the track to begin (hit the drop)
+  /**
+   * Tempo of `musicPath` in beats per minute. When present, section
+   * boundaries (intro/guestCard/transition/pullQuote/outro) snap to the
+   * nearest beat so cuts land in time with the track. Clip lengths are
+   * never altered — they always match the source footage.
+   */
+  musicBpm?: number;
+
+  /** Which side the host name sits on during clips (guest takes the other side). Defaults to 'left'. */
+  hostSide?: 'left' | 'right';
+  /** If present, replaces the built-in Intro scene with this video, full-bleed. */
+  intro?: VideoOverride;
+  /** If present, replaces the built-in Outro scene with this video, full-bleed. */
+  outro?: VideoOverride;
 }
 
 // ─── Timing helper ─────────────────────────────────────────────────────────────

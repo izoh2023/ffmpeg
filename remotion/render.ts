@@ -49,6 +49,18 @@ function stageAssets(props: TrailerProps): TrailerProps {
     musicPath: props.musicPath
       ? `http://localhost:${EXPRESS_PORT}/static/${path.basename(props.musicPath)}`
       : '',
+    intro: props.intro
+      ? {
+          ...props.intro,
+          videoPath: `http://localhost:${EXPRESS_PORT}/static/${path.basename(props.intro.videoPath)}`,
+        }
+      : props.intro,
+    outro: props.outro
+      ? {
+          ...props.outro,
+          videoPath: `http://localhost:${EXPRESS_PORT}/static/${path.basename(props.outro.videoPath)}`,
+        }
+      : props.outro,
   };
 }
 

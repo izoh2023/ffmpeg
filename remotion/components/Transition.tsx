@@ -8,6 +8,8 @@ import {
 import { ResolvedBranding, MotionProp } from '../types';
 import {
   EASE_EXPO_OUT,
+  colorGradeTint,
+  flashCut,
   typewriterChars,
 } from './utils/animations';
 
@@ -138,22 +140,42 @@ export const Transition: React.FC<TransitionProps> = ({ title, branding, motion 
     easing: EASE_EXPO_OUT,
   });
 
+  // ─── Color grade wash — same treatment as every other scene ─────────────
+  const gradeOpacity = interpolate(frame, [10, 30], [0, 0.18], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+    easing: EASE_EXPO_OUT,
+  });
+  const gradeTint = colorGradeTint(motion.colorGrade, colors.primary);
+
+  // ─── Flash-cut spike — mirrors ClipSegment's tail flash at frame 0 ──────
+  const cutFlash = flashCut(frame, 0, 0.8, 8);
+
   return (
-    <AbsoluteFill
-      style={{
-        backgroundColor: colors.cutBackground,
-        opacity: sceneOpacity,
-        overflow: 'hidden',
-        justifyContent: 'center',
-        alignItems: 'center',
-        flexDirection: 'column',
-        padding: '0 8%',
-      }}
-    >
+    <AbsoluteFill style={{ backgroundColor: colors.cutBackground, overflow: 'hidden' }}>
+      <AbsoluteFill
+        style={{
+          opacity: sceneOpacity,
+          justifyContent: 'center',
+          alignItems: 'center',
+          flexDirection: 'column',
+          padding: '0 8%',
+        }}
+      >
       {/* Soft brand radial */}
       <AbsoluteFill
         style={{
           background: `radial-gradient(ellipse at center, ${colors.primary}10 0%, ${colors.cutBackground} 65%)`,
+          pointerEvents: 'none',
+        }}
+      />
+
+      {/* Color grade wash */}
+      <AbsoluteFill
+        style={{
+          background: gradeTint,
+          opacity: gradeOpacity,
+          mixBlendMode: 'overlay',
           pointerEvents: 'none',
         }}
       />
@@ -262,6 +284,18 @@ export const Transition: React.FC<TransitionProps> = ({ title, branding, motion 
           }}
         />
       )}
+      </AbsoluteFill>
+
+      {/* Flash-cut spike — independent of the scene's own fade-in so it
+          reads at full punch right as the incoming clip's flash hands off. */}
+      <AbsoluteFill
+        style={{
+          backgroundColor: colors.primary,
+          opacity: cutFlash,
+          mixBlendMode: 'screen',
+          pointerEvents: 'none',
+        }}
+      />
     </AbsoluteFill>
   );
 };

@@ -9,12 +9,14 @@ import {
 import { ResolvedBranding, EpisodeProp, MotionProp } from '../types';
 import {
   EASE_EXPO_OUT,
+  colorGradeTint,
   fadeIn,
   fadeOut,
   fadeUp,
   logoSlam,
   typewriterChars,
 } from './utils/animations';
+import { CinematicBars } from './CinematicBars';
 
 interface IntroProps {
   branding: ResolvedBranding;
@@ -63,6 +65,14 @@ export const Intro: React.FC<IntroProps> = ({ branding, episode, motion }) => {
 
   const smashCut = fadeOut(frame, introDuration - 14, 14);
   const vignetteOpacity = fadeIn(frame, 0, 30);
+
+  // ─── Color grade wash — same treatment as every other scene ─────────────
+  const gradeOpacity = interpolate(frame, [40, 70], [0, 0.2], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+    easing: EASE_EXPO_OUT,
+  });
+  const gradeTint = colorGradeTint(motion.colorGrade, colors.primary);
 
   return (
     <AbsoluteFill
@@ -193,6 +203,18 @@ export const Intro: React.FC<IntroProps> = ({ branding, episode, motion }) => {
           pointerEvents: 'none',
         }}
       />
+
+      {/* Color grade wash */}
+      <AbsoluteFill
+        style={{
+          background: gradeTint,
+          opacity: gradeOpacity,
+          mixBlendMode: 'overlay',
+          pointerEvents: 'none',
+        }}
+      />
+
+      {motion.energy === 'cinematic' && <CinematicBars delay={10} />}
 
       {/* Brand-colored bloom on the slam landing (hype only) */}
       {motion.energy === 'hype' && (

@@ -18,10 +18,26 @@ export const FADE_FRAMES         = 12;                       // 0.4s scene edge 
 export const secToFrames = (seconds: number): number =>
   Math.round(seconds * FPS);
 
+/**
+ * Snap a frame count to the nearest whole-beat multiple of `beatFrames`,
+ * never collapsing to zero beats.
+ */
+function snapToBeat(frames: number, beatFrames: number): number {
+  if (!beatFrames) return frames;
+  const beats = Math.max(1, Math.round(frames / beatFrames));
+  return beats * beatFrames;
+}
+
 export function buildTimeline(props: TrailerProps): TrailerTimeline {
-  const { clips } = props;
+  const { clips, musicBpm } = props;
   const beats: TrailerBeat[] = [];
   let cursor = 0;
+
+  // Beat grid — only built-in section durations snap to it. Clip lengths
+  // and user-supplied intro/outro video durations always match the source
+  // footage and are never stretched or trimmed.
+  const beatFrames = musicBpm ? (FPS * 60) / musicBpm : 0;
+  const snap = (frames: number) => (beatFrames ? snapToBeat(frames, beatFrames) : frames);
 
   const push = (b: Omit<TrailerBeat, 'start'>): TrailerBeat => {
     const beat: TrailerBeat = { ...b, start: cursor };
@@ -31,10 +47,11 @@ export function buildTimeline(props: TrailerProps): TrailerTimeline {
   };
 
   // ── 1. Intro ──────────────────────────────────────────────────────────────
-  const introBeat = push({ kind: 'intro', duration: INTRO_FRAMES });
+  const introDuration = props.intro ? secToFrames(props.intro.duration) : snap(INTRO_FRAMES);
+  const introBeat = push({ kind: 'intro', duration: introDuration });
 
   // ── 2. Guest card ─────────────────────────────────────────────────────────
-  const guestBeat = push({ kind: 'guestCard', duration: GUEST_CARD_FRAMES });
+  const guestBeat = push({ kind: 'guestCard', duration: snap(GUEST_CARD_FRAMES) });
 
   // ── 3. Clips (full length, sequential) with transitions in between ────────
   clips.forEach((clip, i) => {
@@ -48,17 +65,18 @@ export function buildTimeline(props: TrailerProps): TrailerTimeline {
     if (i < clips.length - 1) {
       push({
         kind: 'transition',
-        duration: TRANSITION_FRAMES,
+        duration: snap(TRANSITION_FRAMES),
         title: clips[i + 1].title,
       });
     }
   });
 
   // ── 4. Pull quote ─────────────────────────────────────────────────────────
-  const pullQuoteBeat = push({ kind: 'pullQuote', duration: PULL_QUOTE_FRAMES });
+  const pullQuoteBeat = push({ kind: 'pullQuote', duration: snap(PULL_QUOTE_FRAMES) });
 
   // ── 5. Outro ──────────────────────────────────────────────────────────────
-  const outroBeat = push({ kind: 'outro', duration: OUTRO_FRAMES });
+  const outroDuration = props.outro ? secToFrames(props.outro.duration) : snap(OUTRO_FRAMES);
+  const outroBeat = push({ kind: 'outro', duration: outroDuration });
 
   // ── Top-level back-compat pointers ────────────────────────────────────────
   const intro: SectionTiming     = { start: introBeat.start,     duration: introBeat.duration };

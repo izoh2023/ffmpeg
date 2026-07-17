@@ -18,6 +18,7 @@ import { ClipSegment } from '../components/ClipSegment';
 import { Transition } from '../components/Transition';
 import { PullQuote } from '../components/PullQuote';
 import { Outro } from '../components/Outro';
+import { RawVideoScene } from '../components/RawVideoScene';
 
 // ─── Music ducking levels ────────────────────────────────────────────────────
 const MUSIC_FULL    = 1;
@@ -25,7 +26,10 @@ const MUSIC_DUCKED  = 0.30;  // under the pull quote
 const MUSIC_CLIPS   = 0.18;  // quieter under speech-heavy clips
 
 export const Trailer: React.FC<TrailerProps> = (props) => {
-  const { clips, guest, episode, branding, motion, musicPath, musicTrimStart } = props;
+  const {
+    clips, guest, episode, branding, motion, musicPath, musicTrimStart,
+    hostSide = 'left', intro, outro,
+  } = props;
   const frame = useCurrentFrame();
   const { fps, durationInFrames } = useVideoConfig();
 
@@ -103,7 +107,11 @@ export const Trailer: React.FC<TrailerProps> = (props) => {
       case 'intro':
         return (
           <Sequence key={key} from={beat.start} durationInFrames={beat.duration}>
-            <Intro branding={resolvedBranding} episode={episode} motion={motion} />
+            {intro ? (
+              <RawVideoScene videoPath={intro.videoPath} durationInFrames={beat.duration} />
+            ) : (
+              <Intro branding={resolvedBranding} episode={episode} motion={motion} />
+            )}
           </Sequence>
         );
 
@@ -128,6 +136,7 @@ export const Trailer: React.FC<TrailerProps> = (props) => {
               clipIndex={idx}
               totalClips={clips.length}
               isFirst={beat.isFirst}
+              hostSide={hostSide}
             />
           </Sequence>
         );
@@ -154,7 +163,11 @@ export const Trailer: React.FC<TrailerProps> = (props) => {
       case 'outro':
         return (
           <Sequence key={key} from={beat.start} durationInFrames={beat.duration}>
-            <Outro branding={resolvedBranding} episode={episode} musicPath={musicPath} />
+            {outro ? (
+              <RawVideoScene videoPath={outro.videoPath} durationInFrames={beat.duration} />
+            ) : (
+              <Outro branding={resolvedBranding} episode={episode} musicPath={musicPath} motion={motion} />
+            )}
           </Sequence>
         );
     }

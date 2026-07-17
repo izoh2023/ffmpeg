@@ -110,6 +110,25 @@ const defaultProps: TrailerProps = {
   },
   musicPath: staticFile('Rajiv Punia.mp3'), // Untouched
   musicTrimStart: 4,
+  // Tempo of musicPath in BPM. When set, section cuts (not clip lengths)
+  // snap to the beat grid so the edit lands in time with the track.
+  musicBpm: 120,
+
+  // ── Host/guest name placement during clips ────────────────────────────────
+  // 'left' puts the host name bottom-left and the guest name bottom-right.
+  hostSide: 'right',
+
+  // ── Intro / outro overrides (optional) ─────────────────────────────────────
+  // Omit both to use the built-in animated Intro/Outro scenes. Pass either to
+  // replace that scene with a supplied video, full-bleed, for `duration` seconds.
+  intro: {
+    videoPath: staticFile('client_intro.mp4'),
+    duration: 4,
+  },
+  outro: {
+    videoPath: staticFile('client_intro.mp4'),
+    duration: 7,
+  },
 };
 
 export const RemotionRoot: React.FC = () => {

@@ -7,10 +7,11 @@ import {
   useVideoConfig,
   Img,
 } from 'remotion';
-import { ResolvedBranding, EpisodeProp } from '../types';
+import { ResolvedBranding, EpisodeProp, MotionProp } from '../types';
 import {
   EASE_EXPO_OUT,
   SPRING_TIGHT,
+  colorGradeTint,
   fadeUp,
 } from './utils/animations';
 
@@ -18,6 +19,7 @@ interface OutroProps {
   branding: ResolvedBranding;
   episode: EpisodeProp;
   musicPath: string;
+  motion: MotionProp;
 }
 
 /**
@@ -28,7 +30,7 @@ interface OutroProps {
  * "Coming Soon"-style CTA copy comes from `copy.availableNow` (but the
  * pill itself shows `episode.number` — e.g. "Coming Soon").
  */
-export const Outro: React.FC<OutroProps> = ({ branding, episode }) => {
+export const Outro: React.FC<OutroProps> = ({ branding, episode, motion }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const outroDuration = 7 * fps; // 210f
@@ -51,6 +53,14 @@ export const Outro: React.FC<OutroProps> = ({ branding, episode }) => {
 
   // Background brightness pulse
   const bgPulse = 1 + 0.04 * Math.sin((frame / fps) * 0.9 * Math.PI);
+
+  // Color grade wash — same treatment as every other scene
+  const gradeOpacity = interpolate(frame, [16, 40], [0, 0.16], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+    easing: EASE_EXPO_OUT,
+  });
+  const gradeTint = colorGradeTint(motion.colorGrade, colors.navy);
 
   // Title slides down from above
   const titleSpring = spring({
@@ -118,6 +128,16 @@ export const Outro: React.FC<OutroProps> = ({ branding, episode }) => {
         style={{
           background:
             'linear-gradient(125deg, rgba(255,255,255,0.08) 0%, transparent 35%, transparent 65%, rgba(0,0,0,0.06) 100%)',
+          pointerEvents: 'none',
+        }}
+      />
+
+      {/* Color grade wash */}
+      <AbsoluteFill
+        style={{
+          background: gradeTint,
+          opacity: gradeOpacity,
+          mixBlendMode: 'overlay',
           pointerEvents: 'none',
         }}
       />

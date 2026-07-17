@@ -11,6 +11,7 @@ import { GuestProp, ResolvedBranding, MotionProp } from '../types';
 import {
   EASE_EXPO_OUT,
   SPRING_TIGHT,
+  colorGradeTint,
   fadeIn,
   fadeUp,
 } from './utils/animations';
@@ -325,21 +326,6 @@ export const GuestCard: React.FC<GuestCardProps> = ({
 };
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
-
-const colorGradeTint = (
-  grade: MotionProp['colorGrade'],
-  brandPrimary: string
-): string => {
-  switch (grade) {
-    case 'warm':
-      return `linear-gradient(135deg, ${brandPrimary}cc 0%, #c97a1f80 100%)`;
-    case 'cool':
-      return 'linear-gradient(135deg, #3b6fcccc 0%, #0d1f4180 100%)';
-    case 'neutral':
-    default:
-      return 'linear-gradient(135deg, rgba(255,240,220,0.6) 0%, rgba(40,40,40,0.4) 100%)';
-  }
-};
 
 const GRAIN_SVG =
   `<svg xmlns="http://www.w3.org/2000/svg" width="220" height="220">` +

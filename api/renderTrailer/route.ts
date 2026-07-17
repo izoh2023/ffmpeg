@@ -39,6 +39,14 @@ interface RenderRequest {
     pullQuoteHighlights: string[];
   };
   branding: { primaryColor: string; logoPath: string; showName: string; musicPath?: string };
+  /** Which side the host name sits on during clips (guest takes the other side). Defaults to 'left'. */
+  hostSide?: "left" | "right";
+  /** If present, replaces the built-in Intro scene with this video, full-bleed. */
+  intro?: { videoPath: string; duration: number };
+  /** If present, replaces the built-in Outro scene with this video, full-bleed. */
+  outro?: { videoPath: string; duration: number };
+  /** Tempo of branding.musicPath in BPM — section cuts snap to the beat grid when present. */
+  musicBpm?: number;
 }
 
 interface RenderJob {
@@ -84,7 +92,7 @@ async function runRenderJob(jobId: string, request: RenderRequest) {
   writeJob(jobId, job);
 
   try {
-    const { clips: clipsPayload, guest, episode, branding } = request;
+    const { clips: clipsPayload, guest, episode, branding, hostSide, intro, outro, musicBpm } = request;
 
     const clips = clipsPayload.files.map((f) => {
       const absolutePath = path.join(JOBS_DIR, clipsPayload.jobId, "clips", f.fileName);
@@ -115,6 +123,10 @@ async function runRenderJob(jobId: string, request: RenderRequest) {
     branding,
     motion: { energy: 'hype', colorGrade: 'warm' },
     musicPath: branding.musicPath ?? "",
+    hostSide,
+    intro,
+    outro,
+    musicBpm,
   },
   outputFile,
   (progress) => {
