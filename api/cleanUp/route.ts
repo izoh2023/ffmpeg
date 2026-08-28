@@ -20,6 +20,17 @@ cleanup.delete("/job/:jobId", (req, res) => {
             return res.status(400).json({ error: "Job is still processing, cannot delete" });
         }
 
+        const preserveErrors = req.query.preserveErrors === "true";
+        if (preserveErrors && job.status === "error") {
+            for (const entry of fs.readdirSync(jobDir)) {
+                if (entry !== "job.json") {
+                    fs.rmSync(path.join(jobDir, entry), { recursive: true, force: true });
+                }
+            }
+            console.log(`[Cleanup] Preserved error metadata for job ${jobId}`);
+            return res.json({ success: true, jobId, preserved: "job.json", message: "Error metadata preserved" });
+        }
+
         fs.rmSync(jobDir, { recursive: true, force: true });
         console.log(`[Cleanup] Removed job ${jobId}`);
         return res.json({ success: true, jobId, message: "Job deleted successfully" });

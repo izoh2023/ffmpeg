@@ -69,7 +69,7 @@ function resolveOverlayConfig(region: DelogoRegion): {
 
     if (region.frame_w > region.frame_h) {
         // Landscape — offset y by content_top to skip black bars
-        const size = 80;
+        const size = 180;
         return {
             mode: "landscape",
             size,
@@ -77,7 +77,7 @@ function resolveOverlayConfig(region: DelogoRegion): {
             y: region.content_top + margin,
         };
     } else {
-        const size = 140;
+        const size = 210;
         return {
             mode: "portrait",
             size,
@@ -85,6 +85,18 @@ function resolveOverlayConfig(region: DelogoRegion): {
             y: region.y,
         };
     }
+}
+
+function clampDelogoRegion(region: DelogoRegion): DelogoRegion {
+    const x = Math.max(1, Math.min(region.x, region.frame_w - 2));
+    const y = Math.max(1, Math.min(region.y, region.frame_h - 2));
+    return {
+        ...region,
+        x,
+        y,
+        w: Math.max(1, Math.min(region.w, region.frame_w - x - 1)),
+        h: Math.max(1, Math.min(region.h, region.frame_h - y - 1)),
+    };
 }
 
 // ── job processor ─────────────────────────────────────────────────────────────
@@ -105,7 +117,7 @@ export async function processLogoSwapJob(
     // ── Step 1: detect old logo ──
     await update(10);
     console.log(`[LogoSwap ${jobId}] Detecting logo...`);
-    const region = await detectLogo(job.inputVideo);
+    const region = clampDelogoRegion(await detectLogo(job.inputVideo));
     console.log(`[LogoSwap ${jobId}] Detected: x=${region.x} y=${region.y} w=${region.w} h=${region.h} frame=${region.frame_w}x${region.frame_h} content_top=${region.content_top}`);
 
     // ── Step 2: resolve overlay config ──
@@ -116,14 +128,8 @@ export async function processLogoSwapJob(
     await update(30);
     const finalOut = path.join(jobDir, "output.mp4");
 
-    // Clamp delogo region strictly inside frame (ffmpeg delogo rejects edge-touching regions)
-    const delogoX = Math.min(region.x, region.frame_w - 2);
-    const delogoY = Math.min(region.y, region.frame_h - 2);
-    const delogoW = Math.min(region.w, region.frame_w - delogoX - 1);
-    const delogoH = Math.min(region.h, region.frame_h - delogoY - 1);
-
     const filterComplex = [
-        `[0:v]delogo=x=${delogoX}:y=${delogoY}:w=${delogoW}:h=${delogoH}[clean]`,
+        `[0:v]delogo=x=${region.x}:y=${region.y}:w=${region.w}:h=${region.h},fps=30[clean]`,
         `[1:v]scale=${overlay.size}:-1[logo]`,
         `[clean][logo]overlay=${overlay.x}:${overlay.y}`,
     ].join(";");
@@ -141,7 +147,8 @@ export async function processLogoSwapJob(
             "-preset", "ultrafast",
             "-tune", "zerolatency",
             "-pix_fmt", "yuv420p",
-            "-c:a", "copy",
+            "-c:a", "aac",
+            "-b:a", "192k",
             "-y", finalOut,
         ],
         {},

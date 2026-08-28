@@ -134,6 +134,35 @@ def detect_with_fallback(frame, search_fraction, hsv_lower, hsv_upper, min_area,
     return None
 
 
+def detect_across_frames(cap, fps, duration_secs, sample_times, search_fractions,
+                         hsv_lower, hsv_upper, min_area):
+    """Search several timestamps and progressively wider right-side regions."""
+    color_attempts = [
+        (hsv_lower, hsv_upper, min_area),
+        (np.array([10, 50, 80]), np.array([40, 255, 255]), 50),
+        (np.array([5, 35, 60]), np.array([45, 255, 255]), 40),
+    ]
+
+    for sample_time in sample_times:
+        bounded_time = max(0.0, min(float(sample_time), max(duration_secs - 0.1, 0.0)))
+        cap.set(cv2.CAP_PROP_POS_FRAMES, int(fps * bounded_time))
+        ret, frame = cap.read()
+        if not ret or is_black_frame(frame):
+            continue
+
+        frame_h, frame_w = frame.shape[:2]
+        content_top, content_bottom = detect_content_bounds(frame)
+        for search_fraction in search_fractions:
+            for lower, upper, area in color_attempts:
+                result = detect_by_color(
+                    frame, search_fraction, lower, upper, area,
+                    content_top, content_bottom,
+                )
+                if result:
+                    return (*result, frame_w, frame_h, content_top, content_bottom)
+    return None
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--video",      required=True)
@@ -142,7 +171,7 @@ def main():
     parser.add_argument("--hsv-lower",  default="18,80,120",       dest="hsv_lower")
     parser.add_argument("--hsv-upper",  default="35,255,255",      dest="hsv_upper")
     parser.add_argument("--min-area",   type=int,   default=100,   dest="min_area")
-    parser.add_argument("--padding",    type=int,   default=8)
+    parser.add_argument("--padding",    type=int,   default=32)
     args = parser.parse_args()
 
     hsv_lower = np.array([int(v) for v in args.hsv_lower.split(",")])
@@ -157,22 +186,30 @@ def main():
     fw  = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     fh  = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
-    frame = find_usable_frame(cap, fps, skip_secs=args.skip_secs)
+    frame_count = cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0
+    duration_secs = frame_count / fps if frame_count > 0 else max(args.skip_secs, 5.0)
+    sample_times = list(dict.fromkeys([
+        min(1.0, duration_secs * 0.1),
+        min(args.skip_secs, duration_secs * 0.25),
+        duration_secs * 0.5,
+        duration_secs * 0.75,
+    ]))
+    search_fractions = list(dict.fromkeys([
+        args.search,
+        min(max(args.search * 2, 0.5), 0.75),
+        0.75,
+    ]))
+    detected = detect_across_frames(
+        cap, fps, duration_secs, sample_times, search_fractions,
+        hsv_lower, hsv_upper, args.min_area,
+    )
     cap.release()
 
-    if frame is None:
-        print(json.dumps({"error": "Could not find a non-black frame"}))
+    if detected is None:
+        print(json.dumps({"error": "Logo not detected across sampled frames — check logo color or position"}))
         sys.exit(1)
 
-    content_top, content_bottom = detect_content_bounds(frame)
-
-    result = detect_with_fallback(frame, args.search, hsv_lower, hsv_upper, args.min_area, content_top, content_bottom)
-
-    if result is None:
-        print(json.dumps({"error": "Logo not detected — adjust HSV range or min-area"}))
-        sys.exit(1)
-
-    x, y, w, h = result
+    x, y, w, h, fw, fh, content_top, content_bottom = detected
     x = max(0, x - args.padding)
     y = max(0, y - args.padding)
     w = min(w + args.padding * 2, fw - x - 1)
