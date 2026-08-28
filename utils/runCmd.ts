@@ -14,6 +14,7 @@ export function runCmd(
         let lastLogTime = 0; // Track when we last printed to console
         const LOG_INTERVAL = 5000; // Only log progress every 5 seconds
         let killed = false;
+        let stderrTail = "";
 
         const overallTimeout = setTimeout(() => {
             if (!killed) {
@@ -37,6 +38,7 @@ export function runCmd(
 
         child.stderr.on('data', (data) => {
             const output = data.toString();
+            stderrTail = (stderrTail + output).slice(-4000);
             const now = Date.now();
 
             if (output.includes('frame=') || output.includes('time=')) {
@@ -64,7 +66,7 @@ export function runCmd(
             clearTimeout(overallTimeout);
             clearInterval(stallCheckInterval);
             if (!killed) {
-                code === 0 ? resolve() : reject(new Error(`Exit code ${code}`));
+                code === 0 ? resolve() : reject(new Error(`Exit code ${code}: ${stderrTail.trim()}`));
             }
         });
     });

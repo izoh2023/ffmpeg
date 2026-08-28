@@ -1,0 +1,1605 @@
+{
+  "name": "Google Sheets - Batch FFmpeg Logo Swap",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "10000000-0000-4000-8000-000000000001",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -1280,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "10000000-0000-4000-8000-000000000002",
+      "name": "Hourly Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -1280,
+        240
+      ],
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "20000000-0000-4000-8000-000000000001",
+              "name": "sheetDocumentId",
+              "value": "1IoHQ_xxDS4acrdv1MI05cDHw-EJkKs2exKngNEcD2o4",
+              "type": "string"
+            },
+            {
+              "id": "20000000-0000-4000-8000-000000000002",
+              "name": "sheetName",
+              "value": "January Content",
+              "type": "string"
+            },
+            {
+              "id": "20000000-0000-4000-8000-000000000003",
+              "name": "outputFolderId",
+              "value": "REPLACE_WITH_OUTPUT_DRIVE_FOLDER_ID",
+              "type": "string"
+            },
+            {
+              "id": "20000000-0000-4000-8000-000000000004",
+              "name": "replacementLogoFileId",
+              "value": "REPLACE_WITH_LOGO_DRIVE_FILE_ID",
+              "type": "string"
+            },
+            {
+              "id": "20000000-0000-4000-8000-000000000005",
+              "name": "ffmpegBaseUrl",
+              "value": "http://host.docker.internal:9000",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "10000000-0000-4000-8000-000000000003",
+      "name": "Configuration - Edit These Values",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1040,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "url": "={{ 'https://sheets.googleapis.com/v4/spreadsheets/' + $('Configuration - Edit These Values').first().json.sheetDocumentId }}",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "includeGridData",
+              "value": "true"
+            },
+            {
+              "name": "ranges",
+              "value": "={{ \"'\" + $('Configuration - Edit These Values').first().json.sheetName.replace(/'/g, \"''\") + \"'!A:F\" }}"
+            },
+            {
+              "name": "fields",
+              "value": "sheets(properties(title),data(startRow,rowData(values(formattedValue,hyperlink,userEnteredValue,textFormatRuns,chipRuns))))"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "fullResponse": false,
+              "neverError": false,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "10000000-0000-4000-8000-000000000004",
+      "name": "Read Content Sheet with Link Metadata",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -800,
+        160
+      ],
+      "notesInFlow": true,
+      "notes": "Reads columns A:E with Google Sheets cell metadata so Drive smart-chip URIs are available, not only their displayed filenames. Select the Google Sheets credential on this node.",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "vCA7hw9dD4eQLgXu",
+          "name": "impact cred"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {
+          "reset": false
+        }
+      },
+      "id": "10000000-0000-4000-8000-000000000005",
+      "name": "Process One Clip at a Time",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -440,
+        160
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "10000000-0000-4000-8000-000000000006",
+      "name": "Batch Complete",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        -320,
+        -40
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "20000000-0000-4000-8000-000000000007",
+              "name": "driveFileId",
+              "value": "={{ $('Process One Clip at a Time').item.json.driveFileId }}",
+              "type": "string"
+            },
+            {
+              "id": "20000000-0000-4000-8000-000000000008",
+              "name": "filename",
+              "value": "={{ $('Process One Clip at a Time').item.json.filename }}",
+              "type": "string"
+            },
+            {
+              "id": "20000000-0000-4000-8000-000000000009",
+              "name": "row_number",
+              "value": "={{ $('Process One Clip at a Time').item.json.row_number }}",
+              "type": "number"
+            },
+            {
+              "id": "20000000-0000-4000-8000-000000000010",
+              "name": "contentLink",
+              "value": "={{ $('Process One Clip at a Time').item.json['Content Link'] }}",
+              "type": "string"
+            },
+            {
+              "id": "20000000-0000-4000-8000-000000000011",
+              "name": "existingRebrandedLink",
+              "value": "={{ $('Process One Clip at a Time').item.json['Rebranded Content Links'] || '' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {
+          "stripBinary": true
+        }
+      },
+      "id": "10000000-0000-4000-8000-000000000008",
+      "name": "Prepare Clip Context",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -200,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "20000000-0000-4000-8000-000000000013",
+              "name": "row_number",
+              "value": "={{ $json.row_number }}",
+              "type": "number"
+            },
+            {
+              "id": "20000000-0000-4000-8000-000000000014",
+              "name": "Status",
+              "value": "Processing",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "10000000-0000-4000-8000-000000000010",
+      "name": "Build Processing Source Row",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        40,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $('Configuration - Edit These Values').first().json.sheetDocumentId }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "={{ $('Configuration - Edit These Values').first().json.sheetName }}",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "row_number": "={{ $json.row_number }}",
+            "Status": "={{ $json.Status }}"
+          },
+          "matchingColumns": [
+            "row_number"
+          ],
+          "schema": [
+            {
+              "id": "Name",
+              "displayName": "Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Content Link",
+              "displayName": "Content Link",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Website Link",
+              "displayName": "Website Link",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Rebranded Content Links",
+              "displayName": "Rebranded Content Links",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Failure Reason",
+              "displayName": "Failure Reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "cellFormat": "USER_ENTERED"
+        }
+      },
+      "id": "10000000-0000-4000-8000-000000000011",
+      "name": "Mark Source Row Processing",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        280,
+        200
+      ],
+      "notesInFlow": true,
+      "notes": "Updates only Status on the exact source row. Add Processing to the Status dropdown choices if the sheet uses strict data validation.",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "vCA7hw9dD4eQLgXu",
+          "name": "impact cred"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "url": "={{ 'https://www.googleapis.com/drive/v3/files/' + $('Prepare Clip Context').item.json.driveFileId }}",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "alt",
+              "value": "media"
+            },
+            {
+              "name": "supportsAllDrives",
+              "value": "true"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 600000,
+          "response": {
+            "response": {
+              "fullResponse": false,
+              "neverError": false,
+              "responseFormat": "file",
+              "outputPropertyName": "video"
+            }
+          }
+        }
+      },
+      "id": "10000000-0000-4000-8000-000000000012",
+      "name": "Download Clip from Drive",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        880,
+        280
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "u2Av9c6AgNCTOVZG",
+          "name": "Google Drive account"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 5,
+      "waitBetweenTries": 15000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $('Configuration - Edit These Values').first().json.replacementLogoFileId }}",
+          "mode": "id"
+        },
+        "options": {
+          "binaryPropertyName": "logo",
+          "fileName": "replacement-logo.png"
+        }
+      },
+      "id": "10000000-0000-4000-8000-000000000013",
+      "name": "Download Replacement Logo",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        1120,
+        280
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "u2Av9c6AgNCTOVZG",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Configuration - Edit These Values').first().json.ffmpegBaseUrl + '/upload-video' }}",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "file",
+              "inputDataFieldName": "video"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 600000,
+          "response": {
+            "response": {
+              "fullResponse": false,
+              "neverError": false,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "10000000-0000-4000-8000-000000000014",
+      "name": "Upload Clip to Local FFmpeg",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1360,
+        280
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {
+          "includeUnpaired": false,
+          "clashHandling": {
+            "values": {
+              "resolveClash": "preferInput2"
+            }
+          }
+        }
+      },
+      "id": "10000000-0000-4000-8000-000000000015",
+      "name": "Restore Logo Binary",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1600,
+        280
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Configuration - Edit These Values').first().json.ffmpegBaseUrl + '/swap-logo' }}",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "logo",
+              "inputDataFieldName": "logo"
+            },
+            {
+              "parameterType": "formData",
+              "name": "videoPath",
+              "value": "={{ $('Upload Clip to Local FFmpeg').item.json.videoPath }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 600000,
+          "response": {
+            "response": {
+              "fullResponse": false,
+              "neverError": false,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "10000000-0000-4000-8000-000000000016",
+      "name": "Submit Logo Swap Job",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1840,
+        280
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "resume": "timeInterval",
+        "amount": 10,
+        "unit": "seconds",
+        "options": {}
+      },
+      "id": "10000000-0000-4000-8000-000000000017",
+      "name": "Wait Before Status Check",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        2080,
+        280
+      ],
+      "webhookId": "30000000-0000-4000-8000-000000000001"
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Configuration - Edit These Values').first().json.ffmpegBaseUrl + '/swap-logo/status/' + $('Submit Logo Swap Job').item.json.jobId }}",
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "fullResponse": false,
+              "neverError": false,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "10000000-0000-4000-8000-000000000018",
+      "name": "Check Logo Swap Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        2320,
+        280
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "20000000-0000-4000-8000-000000000021",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "done",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "10000000-0000-4000-8000-000000000019",
+      "name": "Swap Complete?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2560,
+        280
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "20000000-0000-4000-8000-000000000022",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "error",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "10000000-0000-4000-8000-000000000020",
+      "name": "Swap Failed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2800,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "20000000-0000-4000-8000-000000000023",
+              "leftValue": "={{ $runIndex >= 720 }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "10000000-0000-4000-8000-000000000021",
+      "name": "Polling Timed Out?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        3040,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Configuration - Edit These Values').first().json.ffmpegBaseUrl + '/swap-logo/download/' + $('Submit Logo Swap Job').item.json.jobId }}",
+        "options": {
+          "timeout": 600000,
+          "response": {
+            "response": {
+              "fullResponse": false,
+              "neverError": false,
+              "responseFormat": "file",
+              "outputPropertyName": "data"
+            }
+          }
+        }
+      },
+      "id": "10000000-0000-4000-8000-000000000022",
+      "name": "Download Processed Video",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        2800,
+        160
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "operation": "upload",
+        "inputDataFieldName": "data",
+        "name": "={{ $('Prepare Clip Context').item.json.filename.replace(/\\.[^.]+$/, '') + '_logo_swapped.mp4' }}",
+        "driveId": {
+          "__rl": true,
+          "value": "My Drive",
+          "mode": "list",
+          "cachedResultName": "My Drive",
+          "cachedResultUrl": "https://drive.google.com/drive/my-drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "={{ $('Configuration - Edit These Values').first().json.outputFolderId }}",
+          "mode": "id"
+        },
+        "options": {
+          "simplifyOutput": true
+        }
+      },
+      "id": "10000000-0000-4000-8000-000000000023",
+      "name": "Upload Result to Drive",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        3040,
+        160
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "u2Av9c6AgNCTOVZG",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "20000000-0000-4000-8000-000000000024",
+              "name": "row_number",
+              "value": "={{ $('Prepare Clip Context').item.json.row_number }}",
+              "type": "number"
+            },
+            {
+              "id": "20000000-0000-4000-8000-000000000025",
+              "name": "Status",
+              "value": "Created",
+              "type": "string"
+            },
+            {
+              "id": "20000000-0000-4000-8000-000000000026",
+              "name": "Rebranded Content Links",
+              "value": "={{ $json.webViewLink || ('https://drive.google.com/file/d/' + $json.id + '/view') }}",
+              "type": "string"
+            },
+            {
+              "id": "20000000-0000-4000-8000-000000000030",
+              "name": "Failure Reason",
+              "value": "",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {
+          "stripBinary": true
+        }
+      },
+      "id": "10000000-0000-4000-8000-000000000024",
+      "name": "Build Completed Sheet Row",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3280,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "20000000-0000-4000-8000-000000000027",
+              "name": "row_number",
+              "value": "={{ $('Prepare Clip Context').item.json.row_number }}",
+              "type": "number"
+            },
+            {
+              "id": "20000000-0000-4000-8000-000000000028",
+              "name": "Status",
+              "value": "Failed",
+              "type": "string"
+            },
+            {
+              "id": "20000000-0000-4000-8000-000000000029",
+              "name": "Rebranded Content Links",
+              "value": "={{ $('Prepare Clip Context').item.json.existingRebrandedLink || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "20000000-0000-4000-8000-000000000031",
+              "name": "Failure Reason",
+              "value": "={{ String($json.error?.message || $json.error || $json.message || ($json.status === 'processing' ? 'FFmpeg processing timed out' : 'Unknown FFmpeg error')).slice(0, 500) }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {
+          "stripBinary": true
+        }
+      },
+      "id": "10000000-0000-4000-8000-000000000025",
+      "name": "Build Failed Sheet Row",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3280,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $('Configuration - Edit These Values').first().json.sheetDocumentId }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "={{ $('Configuration - Edit These Values').first().json.sheetName }}",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "row_number": "={{ $json.row_number }}",
+            "Status": "={{ $json.Status }}",
+            "Rebranded Content Links": "={{ $json['Rebranded Content Links'] }}",
+            "Failure Reason": "={{ $json['Failure Reason'] || '' }}"
+          },
+          "matchingColumns": [
+            "row_number"
+          ],
+          "schema": [
+            {
+              "id": "Name",
+              "displayName": "Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Content Link",
+              "displayName": "Content Link",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Website Link",
+              "displayName": "Website Link",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Rebranded Content Links",
+              "displayName": "Rebranded Content Links",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Failure Reason",
+              "displayName": "Failure Reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "cellFormat": "USER_ENTERED"
+        }
+      },
+      "id": "10000000-0000-4000-8000-000000000026",
+      "name": "Update Rebranded Content Link",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        3520,
+        280
+      ],
+      "notesInFlow": true,
+      "notes": "Writes the uploaded rebranded Drive URL into Rebranded Content Links and sets Status on the same row that supplied Content Link.",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "vCA7hw9dD4eQLgXu",
+          "name": "impact cred"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "DELETE",
+        "url": "={{ $('Configuration - Edit These Values').first().json.ffmpegBaseUrl + '/remove/job/' + $('Submit Logo Swap Job').item.json.jobId }}?preserveErrors=true",
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "fullResponse": false,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "10000000-0000-4000-8000-000000000027",
+      "name": "Clean Up FFmpeg Job",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        3760,
+        280
+      ]
+    },
+    {
+      "parameters": {
+        "method": "DELETE",
+        "url": "={{ $('Configuration - Edit These Values').first().json.ffmpegBaseUrl + '/remove/files' }}",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ [{ videoPath: $('Upload Clip to Local FFmpeg').item.json.videoPath }] }}",
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "fullResponse": false,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "10000000-0000-4000-8000-000000000028",
+      "name": "Clean Up Uploaded Source",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        4000,
+        280
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const response = $input.first().json;\n\nconst uriFromCell = (cell = {}) => {\n  const chipUri = (cell.chipRuns ?? [])\n    .map((run) => run?.chip?.richLinkProperties?.uri)\n    .find(Boolean);\n  if (chipUri) return chipUri;\n  if (cell.hyperlink) return cell.hyperlink;\n  const richTextUri = (cell.textFormatRuns ?? [])\n    .map((run) => run?.format?.link?.uri)\n    .find(Boolean);\n  if (richTextUri) return richTextUri;\n  const formula = cell.userEnteredValue?.formulaValue ?? '';\n  const formulaMatch = formula.match(/^=HYPERLINK\\(\\s*[\"']([^\"']+)/i);\n  if (formulaMatch) return formulaMatch[1];\n  const display = String(cell.formattedValue ?? '').trim();\n  return /^https?:\\/\\//i.test(display) ? display : '';\n};\n\nconst driveFileIdFrom = (value = '') => {\n  const decoded = decodeURIComponent(String(value));\n  return decoded.match(/\\/d\\/([a-zA-Z0-9_-]+)/)?.[1]\n    ?? decoded.match(/[?&]id=([a-zA-Z0-9_-]+)/)?.[1]\n    ?? decoded.match(/\\/file\\/([a-zA-Z0-9_-]+)/)?.[1]\n    ?? (/^[a-zA-Z0-9_-]{20,}$/.test(decoded) ? decoded : '');\n};\n\nconst safeVideoFilename = (cell = {}, driveFileId = '') => {\n  const display = String(cell.formattedValue ?? '').trim();\n  if (display && !/^https?:\\/\\//i.test(display)) return display;\n  return driveFileId + '.mp4';\n};\n\nconst results = [];\nfor (const sheet of response.sheets ?? []) {\n  for (const block of sheet.data ?? []) {\n    const startRow = Number(block.startRow ?? 0);\n    for (const [offset, row] of (block.rowData ?? []).entries()) {\n      const rowNumber = startRow + offset + 1;\n      if (rowNumber === 1) continue;\n      const cells = row.values ?? [];\n      const contentLink = uriFromCell(cells[1]);\n      const rebrandedLink = uriFromCell(cells[4]);\n      const status = String(cells[2]?.formattedValue ?? '').trim();\n      const driveFileId = driveFileIdFrom(contentLink);\n      if (!contentLink || !driveFileId || rebrandedLink || status.toLowerCase() === 'created') continue;\n      results.push({\n        json: {\n          Name: String(cells[0]?.formattedValue ?? '').trim(),\n          'Content Link': contentLink,\n          Status: status,\n          'Website Link': uriFromCell(cells[3]) || String(cells[3]?.formattedValue ?? '').trim(),\n          'Rebranded Content Links': rebrandedLink,\n          'Failure Reason': String(cells[5]?.formattedValue ?? '').trim(),\n          row_number: rowNumber,\n          driveFileId,\n          filename: safeVideoFilename(cells[1], driveFileId),\n        },\n      });\n    }\n  }\n}\nreturn results;"
+      },
+      "id": "10000000-0000-4000-8000-000000000030",
+      "name": "Prepare Eligible Sheet Rows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -680,
+        160
+      ],
+      "notesInFlow": true,
+      "notes": "Keeps rows whose Content Link points to a Drive file and whose Rebranded Content Links cell is blank. Preserves the physical row number for exact updates."
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "url": "={{ 'https://sheets.googleapis.com/v4/spreadsheets/' + $('Configuration - Edit These Values').first().json.sheetDocumentId + '/values/' + encodeURIComponent(\"'\" + $('Configuration - Edit These Values').first().json.sheetName + \"'!F1\") }}",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "valueInputOption",
+              "value": "RAW"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={\"values\":[[\"Failure Reason\"]]}",
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "neverError": false,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "10000000-0000-4000-8000-000000000031",
+      "name": "Ensure Failure Reason Header",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -920,
+        160
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "vCA7hw9dD4eQLgXu",
+          "name": "impact cred"
+        }
+      },
+      "notesInFlow": true,
+      "notes": "Ensures column F is available for per-clip diagnostics."
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "20000000-0000-4000-8000-000000000032",
+              "name": "row_number",
+              "value": "={{ $('Prepare Clip Context').item.json.row_number }}",
+              "type": "number"
+            },
+            {
+              "id": "20000000-0000-4000-8000-000000000033",
+              "name": "Status",
+              "value": "Failed",
+              "type": "string"
+            },
+            {
+              "id": "20000000-0000-4000-8000-000000000034",
+              "name": "Rebranded Content Links",
+              "value": "={{ $('Prepare Clip Context').item.json.existingRebrandedLink || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "20000000-0000-4000-8000-000000000035",
+              "name": "Failure Reason",
+              "value": "={{ ('Drive download: ' + String($json.error?.message || $json.error || $json.message || 'connection failed')).slice(0, 500) }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {
+          "stripBinary": true
+        }
+      },
+      "id": "10000000-0000-4000-8000-000000000032",
+      "name": "Build Download Failed Sheet Row",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1120,
+        520
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $('Configuration - Edit These Values').first().json.sheetDocumentId }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "={{ $('Configuration - Edit These Values').first().json.sheetName }}",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "row_number": "={{ $json.row_number }}",
+            "Status": "={{ $json.Status }}",
+            "Rebranded Content Links": "={{ $json['Rebranded Content Links'] }}",
+            "Failure Reason": "={{ $json['Failure Reason'] || '' }}"
+          },
+          "matchingColumns": [
+            "row_number"
+          ],
+          "schema": [
+            {
+              "id": "Name",
+              "displayName": "Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Content Link",
+              "displayName": "Content Link",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Website Link",
+              "displayName": "Website Link",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Rebranded Content Links",
+              "displayName": "Rebranded Content Links",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Failure Reason",
+              "displayName": "Failure Reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "cellFormat": "USER_ENTERED"
+        }
+      },
+      "id": "10000000-0000-4000-8000-000000000033",
+      "name": "Update Download Failure",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1360,
+        520
+      ],
+      "notesInFlow": true,
+      "notes": "Writes a Drive download failure reason, then continues with the next clip.",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "vCA7hw9dD4eQLgXu",
+          "name": "impact cred"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Configuration - Edit These Values",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hourly Schedule": {
+      "main": [
+        [
+          {
+            "node": "Configuration - Edit These Values",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Configuration - Edit These Values": {
+      "main": [
+        [
+          {
+            "node": "Ensure Failure Reason Header",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Content Sheet with Link Metadata": {
+      "main": [
+        [
+          {
+            "node": "Prepare Eligible Sheet Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Eligible Sheet Rows": {
+      "main": [
+        [
+          {
+            "node": "Process One Clip at a Time",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process One Clip at a Time": {
+      "main": [
+        [
+          {
+            "node": "Batch Complete",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare Clip Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Clip Context": {
+      "main": [
+        [
+          {
+            "node": "Build Processing Source Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Processing Source Row": {
+      "main": [
+        [
+          {
+            "node": "Mark Source Row Processing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Source Row Processing": {
+      "main": [
+        [
+          {
+            "node": "Download Clip from Drive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Clip from Drive": {
+      "main": [
+        [
+          {
+            "node": "Upload Clip to Local FFmpeg",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Download Replacement Logo",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Download Failed Sheet Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Replacement Logo": {
+      "main": [
+        [
+          {
+            "node": "Restore Logo Binary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload Clip to Local FFmpeg": {
+      "main": [
+        [
+          {
+            "node": "Restore Logo Binary",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Restore Logo Binary": {
+      "main": [
+        [
+          {
+            "node": "Submit Logo Swap Job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Submit Logo Swap Job": {
+      "main": [
+        [
+          {
+            "node": "Wait Before Status Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait Before Status Check": {
+      "main": [
+        [
+          {
+            "node": "Check Logo Swap Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Logo Swap Status": {
+      "main": [
+        [
+          {
+            "node": "Swap Complete?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Swap Complete?": {
+      "main": [
+        [
+          {
+            "node": "Download Processed Video",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Swap Failed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Swap Failed?": {
+      "main": [
+        [
+          {
+            "node": "Build Failed Sheet Row",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Polling Timed Out?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Polling Timed Out?": {
+      "main": [
+        [
+          {
+            "node": "Build Failed Sheet Row",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait Before Status Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Processed Video": {
+      "main": [
+        [
+          {
+            "node": "Upload Result to Drive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload Result to Drive": {
+      "main": [
+        [
+          {
+            "node": "Build Completed Sheet Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Completed Sheet Row": {
+      "main": [
+        [
+          {
+            "node": "Update Rebranded Content Link",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Failed Sheet Row": {
+      "main": [
+        [
+          {
+            "node": "Update Rebranded Content Link",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Rebranded Content Link": {
+      "main": [
+        [
+          {
+            "node": "Clean Up FFmpeg Job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clean Up FFmpeg Job": {
+      "main": [
+        [
+          {
+            "node": "Clean Up Uploaded Source",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clean Up Uploaded Source": {
+      "main": [
+        [
+          {
+            "node": "Process One Clip at a Time",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ensure Failure Reason Header": {
+      "main": [
+        [
+          {
+            "node": "Read Content Sheet with Link Metadata",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Download Failed Sheet Row": {
+      "main": [
+        [
+          {
+            "node": "Update Download Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Download Failure": {
+      "main": [
+        [
+          {
+            "node": "Process One Clip at a Time",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": [],
+  "triggerCount": 0,
+  "updatedAt": "2026-08-12T00:00:00.000Z",
+  "versionId": "40000000-0000-4000-8000-000000000001",
+  "active": false
+}
